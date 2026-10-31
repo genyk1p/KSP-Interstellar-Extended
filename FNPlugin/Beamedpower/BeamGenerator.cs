@@ -15,7 +15,7 @@ namespace FNPlugin.Beamedpower
     class BeamGeneratorModule : BeamGenerator { }
 
     [KSPModule("Beam Generator")]//#LOC_KSPIE_BeamGenerator_ModuleName2
-    class BeamGenerator : PartModule, IPartMassModifier, IRescalable<BeamGenerator>
+    partial class BeamGenerator : PartModule, IPartMassModifier, IRescalable<BeamGenerator>
     {
         public const string GROUP = "BeamGenerator";
         public const string GROUP_TITLE = "#LOC_KSPIE_BeamGenerator_groupName";
@@ -208,6 +208,12 @@ namespace FNPlugin.Beamedpower
 
             InitializeWavelengthSelector();
             DetermineTechLevel();
+
+            // Fork: the efficiency is recomputed from the configuration on every load (the saved value may carry wear
+            // or an older tech level), then the wear of the time the vessel was unloaded is added.
+            CatchUpWear();
+            UpdateEfficiencyPercentage();
+            UpdateWearStatus();
         }
 
         private void InitializeWavelengthSelector()
@@ -264,6 +270,7 @@ namespace FNPlugin.Beamedpower
         public override void OnUpdate()
         {
             chooseField.guiActive = CheatOptions.NonStrictAttachmentOrientation || (canSwitchWavelengthInFlight && BeamConfigurations.Count > 1);
+            UpdateWearEvents();
         }
 
         /// <summary>
@@ -353,12 +360,12 @@ namespace FNPlugin.Beamedpower
 
             switch (techLevel)
             {
-                case 3: efficiencyPercentage = activeConfiguration.efficiencyPercentage3; break;
-                case 2: efficiencyPercentage = activeConfiguration.efficiencyPercentage2; break;
-                case 1: efficiencyPercentage = activeConfiguration.efficiencyPercentage1; break;
-                case 0: efficiencyPercentage = activeConfiguration.efficiencyPercentage0; break;
+                case 3: SetBaseEfficiency(activeConfiguration.efficiencyPercentage3); break;
+                case 2: SetBaseEfficiency(activeConfiguration.efficiencyPercentage2); break;
+                case 1: SetBaseEfficiency(activeConfiguration.efficiencyPercentage1); break;
+                case 0: SetBaseEfficiency(activeConfiguration.efficiencyPercentage0); break;
                 default:
-                    efficiencyPercentage = 0; break;
+                    SetBaseEfficiency(0); break;
             }
         }
 

@@ -454,7 +454,9 @@ namespace FNPlugin.Beamedpower
             wavelengthField.guiActive = receiverNotInUse;
             wavelengthNameField.guiActive = receiverNotInUse;
 
-            if (IsEnabled)
+            if (IsEnabled && activeBeamGenerator != null && !activeBeamGenerator.isEnabled)
+                statusStr = Localizer.Format("#LOC_KSPIE_MicrowavePowerTransmitter_GeneratorBroken");//"Beam generator failed" (fork)
+            else if (IsEnabled)
                 statusStr = Localizer.Format("#LOC_KSPIE_MicrowavePowerTransmitter_Statu1");//"Transmitter Active"
             else if (relay)
                 statusStr = Localizer.Format("#LOC_KSPIE_MicrowavePowerTransmitter_Statu2");//"Relay Active"
@@ -520,7 +522,11 @@ namespace FNPlugin.Beamedpower
 
             base.OnFixedUpdate();
 
-            if (activeBeamGenerator != null && IsEnabled && !relay)
+            // Fork: a beam generator disabled by a failure (Kerbalism Reliability sets isEnabled = false) makes no beam.
+            bool transmitting = activeBeamGenerator != null && activeBeamGenerator.isEnabled && IsEnabled && !relay;
+            double wearPowerFraction = 0;
+
+            if (transmitting)
             {
                 double powerTransmissionRatio = (double)(decimal)transmitPower / 100d;
                 double transmissionWasteRatio = (100 - activeBeamGenerator.efficiencyPercentage) / 100d;
@@ -552,7 +558,14 @@ namespace FNPlugin.Beamedpower
                 // generate wasteheat for converting electric power to beamed power
                 if (!CheatOptions.IgnoreMaxTemperature)
                     SupplyFnResourcePerSecond(receivedPower * transmissionWasteRatio, ResourceSettings.Config.WasteHeatInMegawatt);
+
+                wearPowerFraction = power_capacity > 0 ? receivedPower / power_capacity : 0;
             }
+
+            // Fork: emitter wear runs with the transmitted power and the vessel's waste heat (0 when idle).
+            if (activeBeamGenerator != null)
+                activeBeamGenerator.AddWear(TimeWarp.fixedDeltaTime, wearPowerFraction,
+                    wearPowerFraction > 0 ? GetResourceBarRatio(ResourceSettings.Config.WasteHeatInMegawatt) : 0);
 
             // extract solar power from stable power
             nuclear_power -= solar_power;
@@ -732,6 +745,49 @@ namespace FNPlugin.Beamedpower
             return vesselTransmitters;
         }
 
+        private static readonly string[] BeamGeneratorModuleNames = { "IntegratedBeamGenerator", "BeamGeneratorModule" };
+
+        /// <summary>
+        /// Fork: whether an unloaded transmitter still has a working beam generator. Its own integrated generator decides;
+        /// without one, any working generator module on the vessel (they attach to the transmitter part).
+        /// Saved modules carry isEnabled = False after a failure.
+        /// </summary>
+        private static bool ProtoBeamGeneratorWorks(ProtoVessel protoVessel, ProtoPartSnapshot transmitterPart)
+        {
+            bool? own = AnyGeneratorEnabled(transmitterPart);
+            if (own.HasValue)
+                return own.Value;
+
+            bool found = false;
+            foreach (var protoPart in protoVessel.protoPartSnapshots)
+            {
+                bool? enabled = AnyGeneratorEnabled(protoPart);
+                if (!enabled.HasValue)
+                    continue;
+                if (enabled.Value)
+                    return true;
+                found = true;
+            }
+            return !found;
+        }
+
+        /// <summary>null: no generator module on the part; else whether one of them is enabled.</summary>
+        private static bool? AnyGeneratorEnabled(ProtoPartSnapshot protoPart)
+        {
+            bool? result = null;
+            foreach (var protoModule in protoPart.modules)
+            {
+                if (Array.IndexOf(BeamGeneratorModuleNames, protoModule.moduleName) < 0)
+                    continue;
+                string value = protoModule.moduleValues.GetValue("isEnabled");
+                bool enabled = value == null || !bool.TryParse(value, out bool parsed) || parsed;
+                if (enabled)
+                    return true;
+                result = false;
+            }
+            return result;
+        }
+
         /// <summary>
         /// Collect anything that can act like a transmitter, including relays
         /// </summary>
@@ -757,6 +813,10 @@ namespace FNPlugin.Beamedpower
                     // filter on active transmitters
                     var transmitterIsEnabled = bool.Parse(protoModule.moduleValues.GetValue("IsEnabled"));
                     if (!transmitterIsEnabled)
+                        continue;
+
+                    // Fork: a beam generator that failed while the vessel was unloaded (Kerbalism) stops the beam.
+                    if (!ProtoBeamGeneratorWorks(vessel.protoVessel, protoPart))
                         continue;
 
                     var aperture = double.Parse(protoModule.moduleValues.GetValue("aperture"));

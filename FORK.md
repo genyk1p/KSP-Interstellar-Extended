@@ -24,6 +24,11 @@ commit `3b495342` (upstream master on 2026-10-31).
 - `FNPlugin/Propulsion/WaterfallIntegration.cs`: ported to the current Waterfall API (0.8+: `CustomController`
   became `CustomPushController`, values are set with `ModuleWaterfallFX.SetControllerValue`).
 - `build.ps1`: build with the .NET SDK, no Visual Studio needed; `-Deploy` copies into a KSP install.
+- Beam emitter wear (`FNPlugin/Beamedpower/BeamGeneratorWear.cs`, `GameData/WarpPlugin/Patches/BeamGeneratorWear.cfg`):
+  conversion efficiency drops with the hours run at full power (faster with waste heat), an engineer on EVA replaces
+  the emitters. With Kerbalism, a `Reliability` on the generator module; the transmitter stops the beam when the
+  generator is disabled by a failure, loaded or unloaded (`MicrowavePowerTransmitter.cs`).
+- `GameData/WarpPlugin/Localization/Fields/ru.cfg`: Russian strings for the fork's additions.
 - `GameData/WarpPlugin/Plugins/Interstellar.dll` and `GameData/Interstellar_Redist.dll` rebuilt from this source
   (upstream's committed binaries are the 1.29.6 ones). Both must be installed together: the new Interstellar.dll
   uses fields added to Interstellar_Redist after 1.29.6 and fails part loading with an old one.

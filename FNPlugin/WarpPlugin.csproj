@@ -140,6 +140,7 @@
     <Compile Include="Extensions\ThermalSourceSearchResult.cs" />
     <Compile Include="Beamedpower\BeamConfiguration.cs" />
     <Compile Include="Beamedpower\BeamGenerator.cs" />
+    <Compile Include="Beamedpower\BeamGeneratorWear.cs" />
     <Compile Include="Beamedpower\BandwidthConverter.cs" />
     <Compile Include="IUpgradeableModule.cs" />
     <Compile Include="Powermanagement\ResourceManager.cs" />
