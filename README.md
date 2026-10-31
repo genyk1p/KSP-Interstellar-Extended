@@ -1,3 +1,5 @@
+> **This is a fork** (genyk1p/KSP-Interstellar-Extended) of [sswelm/KSP-Interstellar-Extended](https://github.com/sswelm/KSP-Interstellar-Extended): it builds the fixes merged upstream after release 1.29.6 and adds its own. See [FORK.md](FORK.md) and [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+
 KSP Interstellar Extended: To The Stars And Beyond!
 ===============
 
