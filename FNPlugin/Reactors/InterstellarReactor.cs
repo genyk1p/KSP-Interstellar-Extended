@@ -1118,8 +1118,10 @@ namespace FNPlugin.Reactors
             var powerPercentageField = Fields[nameof(powerPercentage)];
             powerPercentageField.guiActive = showPowerPercentage;
             UI_FloatRange[] powerPercentageFloatRange = { powerPercentageField.uiControlFlight as UI_FloatRange, powerPercentageField.uiControlEditor as UI_FloatRange };
-            powerPercentageFloatRange[0].minValue = minimumPowerPercentage;
-            powerPercentageFloatRange[1].minValue = minimumPowerPercentage;
+            // fork: the controls are not always sliders — seen in game as UI_Label on a molten salt reactor (cause not
+            // found); the NullReferenceException here aborted the whole OnStart and the reactor threw every FixedUpdate
+            if (powerPercentageFloatRange[0] != null) powerPercentageFloatRange[0].minValue = minimumPowerPercentage;
+            if (powerPercentageFloatRange[1] != null) powerPercentageFloatRange[1].minValue = minimumPowerPercentage;
 
             if (!part.Resources.Contains(ResourceSettings.Config.ThermalPowerInMegawatt))
             {

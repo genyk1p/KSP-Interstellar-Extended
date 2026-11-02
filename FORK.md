@@ -42,6 +42,18 @@ commit `3b495342` (upstream master on 2026-10-31).
   LMOx, only when CryoTanks is installed. Methalox is also appended to the KSPIE LF/Ox switcher (FL-C1000, MEMLander).
 - Kerbal profession checks by the trait config name (`ProtoCrewMember.trait`), not the localized title: science module
   crew factor, ignitor reload, emitter replacement (KNOWN_ISSUES L10).
+- Fission reactor fuel swap (`FNPlugin/Reactors/InterstellarFissionMSRGC.cs`, molten salt, liquid metal and the other
+  `InterstellarFissionMSRGC` reactors): the new fuels were sized from the main fuel of the mode the reactor was loaded
+  in, and `OnStart` skipped that setup when the mode had run out of a fuel, leaving its density at 0, so after a swap
+  every fuel tank of the reactor was 0/0 for good (upstream #696, #678). A swap now keeps the fuel mass of the core;
+  it is refused with a message while actinides are in the core or when fuel left in the core has no room in the
+  vessel's tanks and the next mode would not hold it (also fuel of the next mode already in the core above its new
+  capacity); on load, a mode with no fuel capacity switches to a mode the part has tanks for (KANDL defaults to a
+  uranium mode but carries Pu-238), otherwise its capacity is restored without adding fuel.
+  The fuel mode is restored by name, not by its index in the tech-dependent mode list (upstream #670).
+- `InterstellarReactor.OnStart`: the power slider's minimum is set only when the control is a slider. In game a
+  molten salt reactor had `UI_Label` controls there (cause not found); the NullReferenceException aborted OnStart and
+  the reactor threw on every FixedUpdate.
 - `build.ps1 -Deploy -NoBuild`: install the last build only (used by the MCP tool restart_game). The deploy installs
   `GameData/WarpPlugin` and the two DLLs only; InterstellarFuelSwitch and PhotonSail in the game are the CKAN ones. It
   copies over the installed WarpPlugin and never deletes: a file removed or renamed in the fork stays in the game
