@@ -36,6 +36,12 @@ commit `3b495342` (upstream master on 2026-10-31).
   vessels with the fusion default of 2000 m (upstream #717).
 - Methane pyrolysis is CH4 => C + 2 H2 without oxygen (was a copy of partial oxidation, upstream #724); partial methane
   oxidation uses the mass fractions of 2 CH4 + O2 => 2 CO + 4 H2 (the products were 0.76 of the consumed mass).
+- `Patches/B9PartSwitch/CryoTanksFuelTankSwitcher.cfg`: the KSPIE switcher replaces CryoTanks' own one on LH2 tanks
+  (the CryoTanks hydrogen tanks, two magnetic nozzles) and had dropped the LH2/Ox, methane and methalox fuels CryoTanks
+  offers (upstream #737, #668); they are appended — methane as KSPIE's LqdMethane tank type, methalox with CryoTanks'
+  LMOx, only when CryoTanks is installed. Methalox is also appended to the KSPIE LF/Ox switcher (FL-C1000, MEMLander).
+- Kerbal profession checks by the trait config name (`ProtoCrewMember.trait`), not the localized title: science module
+  crew factor, ignitor reload, emitter replacement (KNOWN_ISSUES L10).
 - `build.ps1 -Deploy -NoBuild`: install the last build only (used by the MCP tool restart_game). The deploy installs
   `GameData/WarpPlugin` and the two DLLs only; InterstellarFuelSwitch and PhotonSail in the game are the CKAN ones. It
   copies over the installed WarpPlugin and never deletes: a file removed or renamed in the fork stays in the game

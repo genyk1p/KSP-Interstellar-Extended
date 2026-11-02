@@ -531,10 +531,11 @@ namespace FNPlugin
         {
             float kerbalFactor;
 
-            // initialise with profession
-            if (kerbal.experienceTrait.Title == "Scientist")
+            // initialise with profession (fork: trait is the config name; experienceTrait.Title is localized, so on a
+            // non-English game every kerbal counted as 0.5)
+            if (kerbal.trait == "Scientist")
                 kerbalFactor = 1.5f;
-            else if (kerbal.experienceTrait.Title == "Engineer")
+            else if (kerbal.trait == "Engineer")
                 kerbalFactor = 1f;
             else
                 kerbalFactor = 0.5f;

@@ -19,6 +19,7 @@
 | L7 | **Мгновенная наука KSPIE мимо Kerbalism:** эксперименты `ModuleScienceExperiment` на 17 деталях (магнитометр, масс-спектрометры, лазеры, приёмники…) дают 10–200 науки за нажатие. У нас сняты патчем `zzz_KSPIEScience`. | есть |
 | L8 | **Принятый PR #692 (эффекты Waterfall для РСУ) не компилировался:** файл `WaterfallIntegration.cs` не вписан в проект, нет ссылки на Waterfall, код под старый интерфейс Waterfall. То есть master с января 2022 никто не собирал. | исправлено в форке |
 | L9 | **Конфликт B9PartSwitch с BDB** («Serious Warning» при загрузке): обе стороны управляют Hydrogen/Oxygen на деталях BDB. | есть |
+| L10 | **Профессия кербала сравнивается по переводимому названию** (`experienceTrait.Title` / `TypeName`, на русском «Инженер»), а не по внутреннему `trait` («Engineer»). На неанглийской игре: научный модуль KSPIE (`ScienceModule.GetKerbalScienceFactor`) считал всех кербалов «прочими» (×0,5 вместо ×1,5 у учёного и ×1 у инженера); перезарядка воспламенителей (`FNSimpleEngineIgnatorFX`) никогда не находила инженера; то же в нашей замене излучателей (найдено 2026-11-02 через MCP: инженер Сарина в выходе — «может только инженер»). | исправлено в форке (2026-11-02): везде `kerbal.trait`. Тот же промах исправлен в нашем BatteryAging 0.1.1 |
 
 ## 2. Открытые сообщения об ошибках — касаются нашей сборки
 
@@ -51,14 +52,14 @@
 ### Баки, IFS, CryoTanks
 | Issue | Проблема | Статус |
 |---|---|---|
-| [#715](https://github.com/sswelm/KSP-Interstellar-Extended/issues/715) | CDT (криогенные двойные баки): вариант «Liquid Water» не создаётся, вода цепляется к LqdAluminium+Oxygen. | не проверено (мы используем CDT2011/2502) |
-| [#737](https://github.com/sswelm/KSP-Interstellar-Extended/issues/737), [#668](https://github.com/sswelm/KSP-Interstellar-Extended/issues/668) | Патч KSPIE для баков CryoTanks убирает варианты LH2/Ox (LH2OCryo) и LMOx. | не проверено |
-| [#703](https://github.com/sswelm/KSP-Interstellar-Extended/issues/703) | В карьере вариант LH2O виден в подсказке бака, но не выбирается. | не проверено |
+| [#715](https://github.com/sswelm/KSP-Interstellar-Extended/issues/715) | CDT (криогенные двойные баки): вариант «Liquid Water» не создаётся, вода цепляется к LqdAluminium+Oxygen. | есть, в IFS (проверено 2026-11-02 по конфигам): патч воды `IFSCDT515LqdWater.cfg` идёт в проходе `FOR[IFSCDT510]`, том же, что у HTP. IFS у нас из CKAN, форк его не ставит; воду в CDT не используем — не чиним |
+| [#737](https://github.com/sswelm/KSP-Interstellar-Extended/issues/737), [#668](https://github.com/sswelm/KSP-Interstellar-Extended/issues/668) | Патч KSPIE для баков CryoTanks убирает варианты LH2/Ox (LH2OCryo) и LMOx. | исправлено в форке (2026-11-02): переключатель KSPIE для баков с LH2 (`Patches/B9PartSwitch/CryoTanksFuelTankSwitcher.cfg`, идёт раньше CryoTanks и забирает у бака водород, поэтому патч CryoTanks его уже не узнаёт) получил варианты, которые даёт CryoTanks: LH2/O (тип KSPIE `LH2OCryo`), метан (тип KSPIE `LqdMethane` — как в списке KSPIE для обычных баков; у CryoTanks свой `LM`, тяжелее на ~20 %), метан + окислитель (тип CryoTanks `LMOx`, только при CryoTanks). У нас это 15 водородных баков CryoTanks и 2 магнитных сопла KSPIE (`magNozzle1`, скрытый `KspiMagneticNozzle3`). Тот же «метан + окислитель» добавлен и в список KSPIE для обычных баков (FL-C1000, `MEMLander`) |
+| [#703](https://github.com/sswelm/KSP-Interstellar-Extended/issues/703) | В карьере вариант LH2O виден в подсказке бака, но не выбирается. | есть, на 2 деталях (2026-11-02, по кэшу MM): список KSPIE для баков «керосин + окислитель» (`moduleID = KSPIE`, вариант LH2/O) стоит на баке FL-C1000 (`Size1p5_Tank_05`) и «Мунном экспедиционном отсеке» (`MEMLander`); остальные обычные баки — с переключателем IFS. В карьере не проверено (глазами в VAB) |
 | [#712](https://github.com/sswelm/KSP-Interstellar-Extended/issues/712) | В IFS нет варианта LiquidMethane+Oxidizer. | пожелание |
 | [#731](https://github.com/sswelm/KSP-Interstellar-Extended/issues/731) | Сухая цена баков после переключения и при масштабировании считается странно. | не проверено |
-| [#676](https://github.com/sswelm/KSP-Interstellar-Extended/issues/676) | Нулевая/отрицательная цена у переработчика ядерного топлива ISRU, реактора на антиматерии, сборщика антиматерии IXS. | не проверено |
+| [#676](https://github.com/sswelm/KSP-Interstellar-Extended/issues/676) | Нулевая/отрицательная цена у переработчика ядерного топлива ISRU, реактора на антиматерии, сборщика антиматерии IXS. | частично (2026-11-02, по кэшу MM и KSP.log — TweakScale пишет «negative dryCost» для 6 деталей): у реакторов (ЯРРС, IXS Hull, Beam Core) цена в конфиге ниже стоимости топлива, но модуль реактора сам добавляет стоимость топлива (`updateModuleCost`), так что пустой реактор стоит свою цену. Баки SM-500 (гидразин 16 тыс. при цене 800) и IFS «Цилиндрический СБ (Твёрдые)» переключаются IFS, который правит цену в игре, — не проверено |
 | [#693](https://github.com/sswelm/KSP-Interstellar-Extended/issues/693) | `TechRequired = Unresearchable` вместо `Unresearcheable` в `IFS/PatchManager/ActiveMMPatches/OnsoleteTanks.cfg` — устаревшие баки не прячутся. | у нас не влияет (проверено 2026-11-02 по кэшу MM): тот же патч ставит `category = none`, все 11 баков скрыты из VAB; в сейве kerbalizm их нет |
-| [#575](https://github.com/sswelm/KSP-Interstellar-Extended/issues/575) | С B9PartSwitch у баков пропадают обычные LF/Ox (патч `Patches/B9PartSwitch/CryoTanksFuelSwitcher.cfg`). | не проверено |
+| [#575](https://github.com/sswelm/KSP-Interstellar-Extended/issues/575) | С B9PartSwitch у баков пропадают обычные LF/Ox (патч `Patches/B9PartSwitch/CryoTanksFuelSwitcher.cfg`). | не проверено (2026-11-02): тот же список KSPIE — только на FL-C1000 и `MEMLander`, LF/O в нём первым вариантом есть; посмотреть в VAB |
 
 ### ISRU и ресурсы
 | Issue | Проблема | Статус |
@@ -72,8 +73,8 @@
 ### Конфиги и совместимость
 | Issue | Проблема | Статус |
 |---|---|---|
-| [#705](https://github.com/sswelm/KSP-Interstellar-Extended/issues/705) | Патч солнечных панелей (`Patches/SolarPanels.cfg`) обнуляет EC у деталей, где есть и панель, и батарея (BDB Vanguard 1). | есть (патч тот же), на наших деталях не проверено |
-| [#648](https://github.com/sswelm/KSP-Interstellar-Extended/issues/648) | Патчи KSPIE используют `:FOR[ЧужойМод]` — это создаёт проход Module Manager, и `NEEDS[ЧужойМод]` у других модов срабатывает, будто мод установлен. Нужно `BEFORE`/`AFTER`. | не проверено, что осталось |
+| [#705](https://github.com/sswelm/KSP-Interstellar-Extended/issues/705) | Патч солнечных панелей (`Patches/SolarPanels.cfg`) обнуляет EC у деталей, где есть и панель, и батарея (BDB Vanguard 1). | у нас не проявляется (2026-11-02, по коду): буфер электричества в `FNSolarPanelWasteHeatModule` создаётся только без Kerbalism |
+| [#648](https://github.com/sswelm/KSP-Interstellar-Extended/issues/648) | Патчи KSPIE используют `:FOR[ЧужойМод]` — это создаёт проход Module Manager, и `NEEDS[ЧужойМод]` у других модов срабатывает, будто мод установлен. Нужно `BEFORE`/`AFTER`. | у нас не проявляется (2026-11-02): патчи KSPIE и IFS в игре объявляют только свои проходы (`WarpPlugin`, `zzzWarpPlugin`, `InterstellarFuelSwitch`, `IFS…`) |
 | [#729](https://github.com/sswelm/KSP-Interstellar-Extended/issues/729) | Загрузка зависает, если в дереве технологий есть узел без `id`. | есть (у нас все узлы с id) |
 | [#694](https://github.com/sswelm/KSP-Interstellar-Extended/issues/694) | Ошибки профиля Kerbalism из IFS — см. L5. | есть |
 | [#681](https://github.com/sswelm/KSP-Interstellar-Extended/issues/681) | Система терморегуляции раскрывается сразу после старта — переключатель «Automated» на радиаторе. | не баг (настройка) |

@@ -45,7 +45,7 @@ namespace FNPlugin.Propulsion
                 ScreenMessages.PostScreenMessage(message, 6.0f, ScreenMessageStyle.UPPER_CENTER);
             }
 
-            var meetProfessionRequirement = reloadRequiresEngineer == false || kervalOnEva.experienceTrait.Title.Equals("Engineer");
+            var meetProfessionRequirement = reloadRequiresEngineer == false || kervalOnEva.trait == "Engineer"; // fork: trait is the config name, Title is localized (never "Engineer" on ru)
 
             if (meetProfessionRequirement && kervalOnEva.experienceLevel >= reloadRequiresExperienceLevel)
             {

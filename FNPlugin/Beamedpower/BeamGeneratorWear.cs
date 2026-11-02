@@ -133,7 +133,8 @@ namespace FNPlugin.Beamedpower
             ProtoCrewMember kerbal = FlightGlobals.ActiveVessel != null && FlightGlobals.ActiveVessel.isEVA
                 ? FlightGlobals.ActiveVessel.GetVesselCrew().FirstOrDefault()
                 : null;
-            if (kerbal == null || kerbal.experienceTrait == null || kerbal.experienceTrait.TypeName != repairTrait)
+            // trait is the config name ("Engineer"); experienceTrait.TypeName / Title are localized ("Инженер")
+            if (kerbal == null || kerbal.trait != repairTrait)
             {
                 ScreenMessages.PostScreenMessage(Localizer.Format("#LOC_KSPIE_BeamGenerator_NeedEngineer"), 5f, ScreenMessageStyle.UPPER_CENTER);
                 return;
