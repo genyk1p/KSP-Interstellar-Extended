@@ -15,6 +15,8 @@ namespace FNPlugin.Storage
         public const string Group = "FNModuleCryostat";
         public const string GroupTitle = "#LOC_IFS_Cryostat_groupName";
         public const string StockResourceElectricCharge = "ElectricCharge";
+        /// <summary>Stored amount at or below which the tank counts as empty: no cooling, no boiloff.</summary>
+        private const double EmptyAmount = 0.0000001;
 
         // Persistent
         [KSPField(isPersistant = true)] public double storedTemp;
@@ -196,7 +198,7 @@ namespace FNPlugin.Storage
 
                 isDisabledField.guiActive = powerReqKW > 0;
 
-                bool coolingIsRelevant = cryostatResource.amount > 0.0000001 && (boilOffRate > 0 || requiresPower);
+                bool coolingIsRelevant = cryostatResource.amount > EmptyAmount && (boilOffRate > 0 || requiresPower);
 
                 powerStatusStrField.guiActive = showPower && requiresPower && coolingIsRelevant;
                 boiloffStrField.guiActive = showBoiloff && currentBoiloff > 0.0000001;
@@ -259,9 +261,22 @@ namespace FNPlugin.Storage
                 return;
 
             var cryostatResource = part.Resources.Get(_resourceDefinition.id);
-            if (cryostatResource == null || double.IsPositiveInfinity(currentPowerReq) || double.IsNaN(currentPowerReq))
+            if (cryostatResource == null)
+            {
+                // Fork: the tank was switched to another resource. The Kerbalism variables added at start stay on the
+                // part; their last values would keep draining this resource from the rest of the vessel (boiloff) and
+                // electric charge (cooling).
+                maxBoiloff = 0;
+                currentBoiloff = 0;
+                SetKerbalismBoiloff(0, 0);
+                SetKerbalismCooling(0);
+                return;
+            }
+            if (double.IsPositiveInfinity(currentPowerReq) || double.IsNaN(currentPowerReq))
             {
                 maxBoiloff = 0;
+                SetKerbalismBoiloff(0, 0);
+                SetKerbalismCooling(0);
                 return;
             }
 
@@ -274,7 +289,12 @@ namespace FNPlugin.Storage
                 receivedPowerKw = FixedReceivedChargeKw(currentPowerReq, fixedDeltaTime);
             }
             else
+            {
                 receivedPowerKw = 0;
+                // Fork: cooling off or nothing to cool (empty tank). Upstream left the Kerbalism cooling variables at
+                // their last value, and its "Cryo Cooling" process kept drawing that much electric charge.
+                SetKerbalismCooling(0);
+            }
 
             var sizeMultiplier = _factor.absolute.quadratic == 0 ? 1 : _factor.absolute.quadratic;
 
@@ -286,11 +306,17 @@ namespace FNPlugin.Storage
 
             currentBoiloff = powerRatioModifier < 1 ? maxBoiloff * (1 - powerRatioModifier) : 0;
 
+            // Fork: an empty tank has nothing to boil (KNOWN_ISSUES L1). Update() sets no power requirement for it, so the
+            // line above gave it the full boiloff; with Kerbalism that boiloff is a vessel-wide process ("LqdHydrogen
+            // Boiloff": input LqdHydrogen x the sum of _LqdHydrogenBoiloff over the vessel) and was taken from the other,
+            // properly cooled tanks.
+            if (cryostatResource.amount <= EmptyAmount)
+                currentBoiloff = 0;
+
             var boiloffResource = Kerbalism.IsLoaded ? part.Resources[boiloffResourceName] : null;
             if (boiloffResource != null)
             {
-                boiloffResource.maxAmount = maxBoiloff * kerbalismBoiloffMultiplier;
-                boiloffResource.amount = currentBoiloff * kerbalismBoiloffMultiplier;
+                SetKerbalismBoiloff(maxBoiloff, currentBoiloff);
             }
             else if (hasExtraBoiloff && currentBoiloff > minimumBoiloff)
             {
@@ -314,23 +340,55 @@ namespace FNPlugin.Storage
             previousReceivedPowerKw = receivedPowerKw;
         }
 
+        /// <summary>
+        /// Fork: the hidden per-part resource the Kerbalism boiloff process reads (only with Kerbalism; no-op without the
+        /// resource). Kerbalism also uses the saved value for an unloaded vessel, until the vessel is loaded again.
+        /// </summary>
+        private void SetKerbalismBoiloff(double max, double current)
+        {
+            var boiloffResource = Kerbalism.IsLoaded && boiloffResourceName != null ? part.Resources[boiloffResourceName] : null;
+            if (boiloffResource == null)
+                return;
+            boiloffResource.maxAmount = max * kerbalismBoiloffMultiplier;
+            boiloffResource.amount = current * kerbalismBoiloffMultiplier;
+        }
+
+        /// <summary>
+        /// Fork: the hidden per-part resources of the Kerbalism cooling processes ("Heating" adds boiloff, "Cryo Cooling"
+        /// removes it for electric charge), both set to the cooling power in kW; 0 = no cooling and no electric charge
+        /// drawn. No-op without Kerbalism or without the resources.
+        /// </summary>
+        private void SetKerbalismCooling(double kw)
+        {
+            if (!Kerbalism.IsLoaded || coolingResourceName == null)
+                return;
+            var coolingResource = part.Resources[coolingResourceName];
+            var heatingResource = part.Resources[heatingResourceName];
+            if (coolingResource == null || heatingResource == null)
+                return;
+            if (kw > 0)
+            {
+                coolingResource.maxAmount = kw;
+                heatingResource.maxAmount = kw;
+            }
+            coolingResource.amount = kw;
+            heatingResource.amount = kw;
+        }
+
         private double FixedReceivedChargeKw(double powerReqKw, double deltaTime)
         {
-            if (powerReqKw <= float.Epsilon)
+            if (powerReqKw <= float.Epsilon || CheatOptions.InfiniteElectricity)
+            {
+                SetKerbalismCooling(0);
                 return powerReqKw;
-
-            if (CheatOptions.InfiniteElectricity)
-                return powerReqKw;
+            }
 
             var coolingResource = Kerbalism.IsLoaded ? part.Resources[coolingResourceName] : null;
             var heatingResource = Kerbalism.IsLoaded ? part.Resources[heatingResourceName] : null;
 
             if (coolingResource != null && heatingResource != null)
             {
-                coolingResource.maxAmount = powerReqKw;
-                heatingResource.maxAmount = powerReqKw;
-                coolingResource.amount = powerReqKw;
-                heatingResource.amount = powerReqKw;
+                SetKerbalismCooling(powerReqKw);
 
                 part.GetConnectedResourceTotals(_electricChargeDefinition.id, out double amount, out _);
 

@@ -28,6 +28,18 @@ commit `3b495342` (upstream master on 2026-10-31).
   conversion efficiency drops with the hours run at full power (faster with waste heat), an engineer on EVA replaces
   the emitters. With Kerbalism, a `Reliability` on the generator module; the transmitter stops the beam when the
   generator is disabled by a failure, loaded or unloaded (`MicrowavePowerTransmitter.cs`).
+- Cryostat with Kerbalism (`FNPlugin/Storage/FNModuleCryostat.cs`): an empty tank, or one switched to another resource,
+  no longer reports boiloff. Kerbalism's boiloff process is vessel-wide, so that boiloff drained the other, cooled tanks
+  (KNOWN_ISSUES L1). The Kerbalism cooling variables are zeroed whenever the tank is not being cooled (empty, cooling
+  off, switched): upstream left them at the last value and the "Cryo Cooling" process kept drawing electric charge.
+- `lethalDistance = 0` on the chemical engines H.A.L.B.E.R.D. and both methane engines: they shut down near crewed
+  vessels with the fusion default of 2000 m (upstream #717).
+- Methane pyrolysis is CH4 => C + 2 H2 without oxygen (was a copy of partial oxidation, upstream #724); partial methane
+  oxidation uses the mass fractions of 2 CH4 + O2 => 2 CO + 4 H2 (the products were 0.76 of the consumed mass).
+- `build.ps1 -Deploy -NoBuild`: install the last build only (used by the MCP tool restart_game). The deploy installs
+  `GameData/WarpPlugin` and the two DLLs only; InterstellarFuelSwitch and PhotonSail in the game are the CKAN ones. It
+  copies over the installed WarpPlugin and never deletes: a file removed or renamed in the fork stays in the game
+  (e.g. `Parts/FuelTank/CrashPad`) until deleted by hand.
 - `GameData/WarpPlugin/Localization/Fields/ru.cfg`: Russian strings for the fork's additions.
 - `GameData/WarpPlugin/Plugins/Interstellar.dll` and `GameData/Interstellar_Redist.dll` rebuilt from this source
   (upstream's committed binaries are the 1.29.6 ones). Both must be installed together: the new Interstellar.dll

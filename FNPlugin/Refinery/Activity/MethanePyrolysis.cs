@@ -8,75 +8,78 @@ using UnityEngine;
 
 namespace FNPlugin.Refinery.Activity
 {
+    /// <summary>
+    /// Methane pyrolysis: CH4 => C + 2 H2, heat only, no oxygen.
+    /// Fork: upstream was a copy of PartialMethaneOxidation (took oxygen, made carbon monoxide, lost a quarter of the mass;
+    /// upstream issue #724). Solid carbon goes to the CRP resource "Carbon" if the vessel stores it; like every product of
+    /// the refinery it needs room unless overflow is allowed.
+    /// </summary>
     [KSPModule("ISRU Methane Pyrolysis")]
     class MethanePyrolysis : RefineryActivity
     {
         public MethanePyrolysis()
         {
             ActivityName = "Methane Pyrolysis";
-            Formula = "CH<size=7>4</size> => H<size=7>2</size> + C";
+            Formula = "CH<size=7>4</size> => C + 2H<size=7>2</size>";
             PowerRequirements = PluginSettings.Config.BaseELCPowerConsumption;
             EnergyPerTon = PluginSettings.Config.ElectrolysisEnergyPerTon;
         }
 
-        private double _monoxideDensity;
+        private const string CarbonResourceName = "Carbon";
+
+        // molar masses: CH4 16.043, C 12.011, H2 2.016
+        private const double CarbonMassByFraction = 12.011 / 16.043;
+        private const double HydrogenMassByFraction = 2 * 2.016 / 16.043;
+
+        private double _carbonDensity;
         private double _methaneDensity;
         private double _hydrogenDensity;
-        private double _oxygenDensity;
 
         private double _methaneConsumptionRate;
-        private double _oxygenConsumptionRate;
-
         private double _hydrogenProductionRate;
-        private double _monoxideProductionRate;
+        private double _carbonProductionRate;
 
-        private string _monoxideResourceName;
+        private string _carbonResourceName;
         private string _methaneResourceName;
         private string _hydrogenResourceName;
-        private string _oxygenResourceName;
 
-        private double _maxCapacityMonoxideMass;
+        private double _maxCapacityCarbonMass;
         private double _maxCapacityHydrogenMass;
         private double _maxCapacityMethaneMass;
-        private double _maxCapacityOxygenMass;
 
         private double _availableMethaneMass;
-        private double _availableOxygenMass;
         private double _spareRoomHydrogenMass;
-        private double _spareRoomMonoxideMass;
-
-        private const double MonoxideMassByFraction = 1 - 18.01528 / (18.01528 + 28.010); // taken from reverse water gas shift
-        private const double HydrogenMassByFraction = (8 * 1.008) / (44.01 + (8 * 1.008));
-        private const double OxygenMassByFraction = 32.0 / 52.0;
-        private const double MethaneMassByFraction = 20.0 / 52.0;
-
-        private double _combinedConsumptionRate;
+        private double _spareRoomCarbonMass;
 
         public override string Status => string.Copy(_status);
         public override RefineryType RefineryType => RefineryType.Heating;
 
         public override bool HasActivityRequirements()
         {
-            if (_monoxideResourceName == null || _hydrogenResourceName == null || _methaneResourceName == null || _oxygenResourceName == null)
+            if (_carbonResourceName == null || _hydrogenResourceName == null || _methaneResourceName == null)
                 return false;
 
-            return _part.GetConnectedResources(_methaneResourceName).Any(rs => rs.amount > 0) &
-                _part.GetConnectedResources(_oxygenResourceName).Any(rs => rs.amount > 0);
+            return _part.GetConnectedResources(_methaneResourceName).Any(rs => rs.amount > 0);
         }
 
         public override void Initialize(Part localPart, InterstellarRefineryController controller)
         {
             base.Initialize(localPart, controller);
 
-            _monoxideResourceName = ResourceSettings.Config.CarbonMonoxideGas;
             _hydrogenResourceName = ResourceSettings.Config.HydrogenGas;
             _methaneResourceName = ResourceSettings.Config.MethaneGas;
-            _oxygenResourceName = ResourceSettings.Config.OxygenGas;
 
-            _monoxideDensity = PartResourceLibrary.Instance.GetDefinition(_monoxideResourceName).density;
             _hydrogenDensity = PartResourceLibrary.Instance.GetDefinition(_hydrogenResourceName).density;
             _methaneDensity = PartResourceLibrary.Instance.GetDefinition(_methaneResourceName).density;
-            _oxygenDensity = PartResourceLibrary.Instance.GetDefinition(_oxygenResourceName).density;
+
+            var carbon = PartResourceLibrary.Instance.GetDefinition(CarbonResourceName);
+            if (carbon == null)
+            {
+                Debug.LogWarning("[KSPI]: MethanePyrolysis: no resource " + CarbonResourceName + " (Community Resource Pack), pyrolysis disabled");
+                return;
+            }
+            _carbonResourceName = carbon.name;
+            _carbonDensity = carbon.density;
         }
 
         public override void UpdateFrame(double rateMultiplier, double powerFraction, double productionModifier, bool allowOverflow, double fixedDeltaTime, bool isStartup = false)
@@ -84,66 +87,52 @@ namespace FNPlugin.Refinery.Activity
             _current_power = PowerRequirements * rateMultiplier;
             _current_rate = CurrentPower / EnergyPerTon;
 
-            // determine how much resource we have
-            var partsThatContainMonoxide = _part.GetConnectedResources(_monoxideResourceName).ToList();
-            var partsThatContainHydrogen = _part.GetConnectedResources(_hydrogenResourceName).ToList();
-            var partsThatContainMethane = _part.GetConnectedResources(_methaneResourceName).ToList();
-            var partsThatContainOxygen = _part.GetConnectedResources(_oxygenResourceName).ToList();
+            if (_carbonResourceName == null)
+            {
+                _methaneConsumptionRate = _hydrogenProductionRate = _carbonProductionRate = 0;
+                UpdateStatusMessage();
+                return;
+            }
 
-            // determine the maximum amount of a resource the vessel can hold (ie. tank capacities combined)
-            _maxCapacityMonoxideMass = partsThatContainMonoxide.Sum(p => p.maxAmount) * _monoxideDensity;
+            // only unlocked tanks: RequestResource below skips locked ones, so free room counted in a locked tank would
+            // let methane be consumed with the product lost
+            var partsThatContainCarbon = _part.GetConnectedResources(_carbonResourceName).Where(r => r.flowState).ToList();
+            var partsThatContainHydrogen = _part.GetConnectedResources(_hydrogenResourceName).Where(r => r.flowState).ToList();
+            var partsThatContainMethane = _part.GetConnectedResources(_methaneResourceName).Where(r => r.flowState).ToList();
+
+            _maxCapacityCarbonMass = partsThatContainCarbon.Sum(p => p.maxAmount) * _carbonDensity;
             _maxCapacityHydrogenMass = partsThatContainHydrogen.Sum(p => p.maxAmount) * _hydrogenDensity;
             _maxCapacityMethaneMass = partsThatContainMethane.Sum(p => p.maxAmount) * _methaneDensity;
-            _maxCapacityOxygenMass = partsThatContainOxygen.Sum(p => p.maxAmount) * _oxygenDensity;
 
-            // determine the amount of resources needed for pyrolysis that the vessel actually holds
             _availableMethaneMass = partsThatContainMethane.Sum(r => r.amount) * _methaneDensity;
-            _availableOxygenMass = partsThatContainOxygen.Sum(r => r.amount) * _oxygenDensity;
 
-            // determine how much spare room there is in the vessel's resource tanks (for the resources this is going to produce)
-            _spareRoomMonoxideMass = partsThatContainMonoxide.Sum(r => r.maxAmount - r.amount) * _monoxideDensity;
+            _spareRoomCarbonMass = partsThatContainCarbon.Sum(r => r.maxAmount - r.amount) * _carbonDensity;
             _spareRoomHydrogenMass = partsThatContainHydrogen.Sum(r => r.maxAmount - r.amount) * _hydrogenDensity;
 
-            // this should determine how much resources this process can consume
-            var fixedMaxMethaneConsumptionRate = _current_rate * MethaneMassByFraction * fixedDeltaTime;
-            var methaneConsumptionRatio = fixedMaxMethaneConsumptionRate > 0
-                ? Math.Min(fixedMaxMethaneConsumptionRate, _availableMethaneMass) / fixedMaxMethaneConsumptionRate
-                : 0;
+            // methane (tons) this step may decompose: limited by power and by the methane on board
+            var fixedMethaneMass = Math.Min(_current_rate * fixedDeltaTime, _availableMethaneMass);
 
-            var fixedMaxOxygenConsumptionRate = _current_rate * OxygenMassByFraction * fixedDeltaTime;
-            var oxygenConsumptionRatio = fixedMaxOxygenConsumptionRate > 0 ? Math.Min(fixedMaxOxygenConsumptionRate, _availableOxygenMass) / fixedMaxOxygenConsumptionRate : 0;
-
-            var fixedConsumptionRate = _current_rate * fixedDeltaTime * Math.Min(methaneConsumptionRatio, oxygenConsumptionRatio);
-
-            // begin the pyrolysis process
-            if (fixedConsumptionRate > 0 && (_spareRoomHydrogenMass > 0 || _spareRoomMonoxideMass > 0))
+            if (fixedMethaneMass > 0 && fixedDeltaTime > 0)
             {
+                var fixedMaxCarbonMass = fixedMethaneMass * CarbonMassByFraction;
+                var fixedMaxHydrogenMass = fixedMethaneMass * HydrogenMassByFraction;
 
-                var fixedMaxMonoxideRate = fixedConsumptionRate * MonoxideMassByFraction;
-                var fixedMaxHydrogenRate = fixedConsumptionRate * HydrogenMassByFraction;
+                var fixedPossibleCarbonMass = allowOverflow ? fixedMaxCarbonMass : Math.Min(_spareRoomCarbonMass, fixedMaxCarbonMass);
+                var fixedPossibleHydrogenMass = allowOverflow ? fixedMaxHydrogenMass : Math.Min(_spareRoomHydrogenMass, fixedMaxHydrogenMass);
 
-                var fixedMaxPossibleMonoxideRate = allowOverflow ? fixedMaxMonoxideRate : Math.Min(_spareRoomMonoxideMass, fixedMaxMonoxideRate);
-                var fixedMaxPossibleHydrogenRate = allowOverflow ? fixedMaxHydrogenRate : Math.Min(_spareRoomHydrogenMass, fixedMaxHydrogenRate);
+                var storageRatio = Math.Min(fixedPossibleCarbonMass / fixedMaxCarbonMass, fixedPossibleHydrogenMass / fixedMaxHydrogenMass);
 
-                var consumptionStorageRatio = Math.Min(fixedMaxPossibleMonoxideRate / fixedMaxMonoxideRate, fixedMaxPossibleHydrogenRate / fixedMaxHydrogenRate);
+                var consumedMethaneMass = _part.RequestResource(_methaneResourceName, storageRatio * fixedMethaneMass / _methaneDensity, ResourceFlowMode.ALL_VESSEL) * _methaneDensity;
+                _methaneConsumptionRate = consumedMethaneMass / fixedDeltaTime;
 
-                // this consumes the resources
-                _oxygenConsumptionRate = _part.RequestResource(_oxygenResourceName, OxygenMassByFraction * consumptionStorageRatio * fixedConsumptionRate / _oxygenDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _oxygenDensity;
-                _methaneConsumptionRate = _part.RequestResource(_methaneResourceName, MethaneMassByFraction * consumptionStorageRatio * fixedConsumptionRate / _methaneDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _methaneDensity;
-                _combinedConsumptionRate = _oxygenConsumptionRate + _methaneConsumptionRate;
-
-                // this produces the products
-                var monoxideRateTemp = _combinedConsumptionRate * MonoxideMassByFraction;
-                var waterRateTemp = _combinedConsumptionRate * HydrogenMassByFraction;
-
-                _monoxideProductionRate = -_part.RequestResource(_monoxideResourceName, -monoxideRateTemp * fixedDeltaTime / _monoxideDensity) / fixedDeltaTime * _monoxideDensity;
-                _hydrogenProductionRate = -_part.RequestResource(_hydrogenResourceName, -waterRateTemp * fixedDeltaTime / _hydrogenDensity) / fixedDeltaTime * _hydrogenDensity;
+                _carbonProductionRate = -_part.RequestResource(_carbonResourceName, -consumedMethaneMass * CarbonMassByFraction / _carbonDensity) / fixedDeltaTime * _carbonDensity;
+                _hydrogenProductionRate = -_part.RequestResource(_hydrogenResourceName, -consumedMethaneMass * HydrogenMassByFraction / _hydrogenDensity) / fixedDeltaTime * _hydrogenDensity;
             }
             else
             {
                 _methaneConsumptionRate = 0;
-                _oxygenConsumptionRate = 0;
                 _hydrogenProductionRate = 0;
+                _carbonProductionRate = 0;
             }
             UpdateStatusMessage();
         }
@@ -155,21 +144,6 @@ namespace FNPlugin.Refinery.Activity
             GUILayout.BeginHorizontal();
             GUILayout.Label(Localizer.Format("#LOC_KSPIE_MethanePyrolysis_Power"), _bold_label, GUILayout.Width(labelWidth));//"Power"
             GUILayout.Label(PluginHelper.GetFormattedPowerString(CurrentPower) + "/" + PluginHelper.GetFormattedPowerString(PowerRequirements), _value_label, GUILayout.Width(valueWidth));
-            GUILayout.EndHorizontal();
-
-            GUILayout.BeginHorizontal();
-            GUILayout.Label(Localizer.Format("#LOC_KSPIE_MethanePyrolysis_OveralConsumption"), _bold_label, GUILayout.Width(labelWidth));//"Overal Consumption"
-            GUILayout.Label(((_combinedConsumptionRate * GameConstants.SECONDS_IN_HOUR).ToString("0.0000")) + " mT/hour", _value_label, GUILayout.Width(valueWidth));
-            GUILayout.EndHorizontal();
-
-            GUILayout.BeginHorizontal();
-            GUILayout.Label(Localizer.Format("#LOC_KSPIE_MethanePyrolysis_OxygenAvailable"), _bold_label, GUILayout.Width(labelWidth));//"Oxygen Available"
-            GUILayout.Label(_availableOxygenMass.ToString("0.0000") + " mT / " + _maxCapacityOxygenMass.ToString("0.0000") + " mT", _value_label, GUILayout.Width(valueWidth));
-            GUILayout.EndHorizontal();
-
-            GUILayout.BeginHorizontal();
-            GUILayout.Label(Localizer.Format("#LOC_KSPIE_MethanePyrolysis_OxygenConsumptionRate"), _bold_label, GUILayout.Width(labelWidth));//"Oxygen Consumption Rate"
-            GUILayout.Label((_oxygenConsumptionRate * GameConstants.SECONDS_IN_HOUR).ToString("0.000") + " mT/hour", _value_label, GUILayout.Width(valueWidth));
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
@@ -193,13 +167,13 @@ namespace FNPlugin.Refinery.Activity
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label(Localizer.Format("#LOC_KSPIE_MethanePyrolysis_CarbonMonoxideStorage"), _bold_label, GUILayout.Width(labelWidth));//"Carbon Monoxide Storage"
-            GUILayout.Label(_spareRoomMonoxideMass.ToString("0.0000") + " mT / " + _maxCapacityMonoxideMass.ToString("0.0000") + " mT", _value_label, GUILayout.Width(valueWidth));
+            GUILayout.Label(Localizer.Format("#LOC_KSPIE_MethanePyrolysis_CarbonStorage"), _bold_label, GUILayout.Width(labelWidth));//"Carbon Storage"
+            GUILayout.Label(_spareRoomCarbonMass.ToString("0.0000") + " mT / " + _maxCapacityCarbonMass.ToString("0.0000") + " mT", _value_label, GUILayout.Width(valueWidth));
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label(Localizer.Format("#LOC_KSPIE_MethanePyrolysis_CarbonMonoxideProductionRate"), _bold_label, GUILayout.Width(labelWidth));//"Carbon Monoxide Production Rate"
-            GUILayout.Label((_monoxideProductionRate * GameConstants.SECONDS_IN_HOUR).ToString("0.000") + " mT/hour", _value_label, GUILayout.Width(valueWidth));
+            GUILayout.Label(Localizer.Format("#LOC_KSPIE_MethanePyrolysis_CarbonProductionRate"), _bold_label, GUILayout.Width(labelWidth));//"Carbon Production Rate"
+            GUILayout.Label((_carbonProductionRate * GameConstants.SECONDS_IN_HOUR).ToString("0.000") + " mT/hour", _value_label, GUILayout.Width(valueWidth));
             GUILayout.EndHorizontal();
         }
 
@@ -217,8 +191,6 @@ namespace FNPlugin.Refinery.Activity
         {
             if (!_part.GetConnectedResources(_methaneResourceName).Any(rs => rs.amount > 0))
                 ScreenMessages.PostScreenMessage(Localizer.Format("#LOC_KSPIE_MethanePyrolysis_PostMsg") +" " + _methaneResourceName, 3.0f, ScreenMessageStyle.UPPER_CENTER);//Missing
-            if (!_part.GetConnectedResources(_oxygenResourceName).Any(rs => rs.amount > 0))
-                ScreenMessages.PostScreenMessage(Localizer.Format("#LOC_KSPIE_MethanePyrolysis_PostMsg") +" " + _oxygenResourceName, 3.0f, ScreenMessageStyle.UPPER_CENTER);//Missing
         }
     }
 }

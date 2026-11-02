@@ -3,12 +3,14 @@
 #
 #   powershell -ExecutionPolicy Bypass -File build.ps1            # build
 #   powershell -ExecutionPolicy Bypass -File build.ps1 -Deploy    # build and copy the DLLs into the game (KSP must be closed)
+#   powershell -ExecutionPolicy Bypass -File build.ps1 -Deploy -NoBuild   # copy the last build only (MCP restart_game)
 #
 # Needs: .NET SDK (dotnet), and the KSP install referenced by the HintPaths in the .csproj files.
 # Reference assemblies for .NET Framework 4.7.2 and 4.8 come from the NuGet cache; if they are missing,
 # any SDK-style project targeting net472/net48 restores them (or run: dotnet new classlib -f net48; dotnet restore).
 param(
     [switch]$Deploy,
+    [switch]$NoBuild,
     [string]$Ksp = 'C:\Program Files (x86)\Steam\steamapps\common\Kerbal Space Program',
     [string]$Backup = 'C:\Games\ClaudeKSP\save_backups\WarpPlugin_1.29.6_ckan'
 )
@@ -29,8 +31,13 @@ foreach ($v in @('472', '48')) {
     if (-not (Test-Path $link)) { cmd /c mklink /J "$link" "$($fwDir.FullName)" | Out-Null }
 }
 
-dotnet msbuild (Join-Path $root 'WarpPlugin.sln') -p:Configuration=Release "-p:TargetFrameworkRootPath=$refRoot" -v:m -nologo
-if ($LASTEXITCODE -ne 0) { throw 'build failed' }
+if (-not $NoBuild) {
+    dotnet msbuild (Join-Path $root 'WarpPlugin.sln') -p:Configuration=Release "-p:TargetFrameworkRootPath=$refRoot" -v:m -nologo
+    if ($LASTEXITCODE -ne 0) { throw 'build failed' }
+}
+foreach ($dll in 'FNPlugin\bin\Release\Interstellar.dll', 'Redist\bin\Release\Interstellar_Redist.dll') {
+    if (-not (Test-Path (Join-Path $root $dll))) { throw "not built: $dll" }
+}
 
 if ($Deploy) {
     if (Get-Process KSP_x64 -ErrorAction SilentlyContinue) { throw 'KSP is running: the DLLs are locked' }

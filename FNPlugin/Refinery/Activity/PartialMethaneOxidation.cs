@@ -15,15 +15,19 @@ namespace FNPlugin.Refinery.Activity
         public PartialMethaneOxidation()
         {
             ActivityName = "Partial Oxidation of Methane";
-            Formula = "CH<size=7>4</size> + O<size=7>2</size> => CO + H<size=7>2</size>";
+            Formula = "2CH<size=7>4</size> + O<size=7>2</size> => 2CO + 4H<size=7>2</size>";
             PowerRequirements = PluginSettings.Config.BaseELCPowerConsumption;
             EnergyPerTon = PluginSettings.Config.ElectrolysisEnergyPerTon;
         }
 
-        private const double MonoxideMassByFraction = 1 - 18.01528 / (18.01528 + 28.010); // taken from reverse water gas shift
-        private const double HydrogenMassByFraction = (8 * 1.008) / (44.01 + (8 * 1.008));
-        private const double OxygenMassByFraction = 32.0 / 52.0;
-        private const double MethaneMassByFraction = 20.0 / 52.0;
+        // Fork: 2 CH4 + O2 => 2 CO + 4 H2 (molar masses CH4 16.043, O2 31.998, CO 28.010, H2 2.016), mass fractions of the
+        // 64.084 g of one reaction. Upstream fractions were copied from the reverse water gas shift: the products came to
+        // 0.76 of the consumed mass, and methane:oxygen was 20:32 instead of 32:32.
+        private const double ReactionMass = 2 * 16.043 + 31.998;
+        private const double MonoxideMassByFraction = 2 * 28.010 / ReactionMass;
+        private const double HydrogenMassByFraction = 4 * 2.016 / ReactionMass;
+        private const double OxygenMassByFraction = 31.998 / ReactionMass;
+        private const double MethaneMassByFraction = 2 * 16.043 / ReactionMass;
 
         private double _fixedConsumptionRate;
         private double _consumptionStorageRatio;
