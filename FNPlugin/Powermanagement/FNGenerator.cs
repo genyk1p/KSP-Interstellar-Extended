@@ -754,6 +754,44 @@ namespace FNPlugin.Powermanagement
 
         public double PowerControlRatio => (double)(decimal)powerPercentage * 0.01;
 
+        // background model (Background/InterstellarBackgroundPower): values kept from load until the generator has run
+        private ConfigNode _loadedBackgroundValues;
+        private bool _backgroundReady;
+        private bool _backgroundErrorLogged;
+
+        public override void OnLoad(ConfigNode node)
+        {
+            base.OnLoad(node);
+            _loadedBackgroundValues = Background.BackgroundSnapshot.CopyBackgroundValues(node);
+        }
+
+        public override void OnSave(ConfigNode node)
+        {
+            base.OnSave(node);
+            if (HighLogic.LoadedSceneIsFlight)
+                Background.BackgroundSnapshot.Save(this, node, _backgroundReady, _loadedBackgroundValues, SaveBackgroundValues, ref _backgroundErrorLogged);
+        }
+
+        private void SaveBackgroundValues(ConfigNode node)
+        {
+            var source = _attachedPowerSource;
+            node.SetValue(Background.BackgroundSnapshot.GeneratorMarker, "True", true);
+            node.SetValue(Background.BackgroundSnapshot.Active, (IsEnabled && source?.Part != null).ToString(), true);
+            node.SetValue(Background.BackgroundSnapshot.ReactorPart, source?.Part != null ? source.Part.flightID.ToString() : "0", true);
+            // MHD generators run on plasma temperature, which the model does not have: their reactor stays on its own catch-up
+            node.SetValue(Background.BackgroundSnapshot.Mhd, isMHD.ToString(), true);
+            node.SetValue(Background.BackgroundSnapshot.Mode, chargedParticleMode ? "Charged" : "Thermal", true);
+            node.SetValue(Background.BackgroundSnapshot.MaxEfficiency, Background.BackgroundSnapshot.Number(maxEfficiency), true);
+            // the reactor lets a generator use only part of its power (ThermalEnergyEfficiency / ChargedParticleEnergyEfficiency:
+            // 1 for fission, 0.01 for an antimatter reactor's thermal power), as RawGeneratorSourcePower does
+            var usage = source == null ? 0 : chargedParticleMode ? source.ChargedParticleEnergyEfficiency : source.ThermalEnergyEfficiency;
+            node.SetValue(Background.BackgroundSnapshot.Share, Background.BackgroundSnapshot.Number(CapacityRatio * Math.Min(1, PowerControlRatio) * usage), true);
+            // an engine's integrated generator only ever gets the reactor's minimum power
+            node.SetValue(Background.BackgroundSnapshot.LimitedToMinimumThrottle, isLimitedByMinThrottle.ToString(), true);
+            // a thermal generator also converts the charged power of a reactor that has no charged particle generator
+            node.SetValue(Background.BackgroundSnapshot.UsesCharged, (!chargedParticleMode && source != null && !source.IsConnectedToChargedGenerator).ToString(), true);
+        }
+
         public double GetHotBathTemperature(double coldBathTemperature)
         {
             if (_attachedPowerSource == null)
@@ -953,6 +991,7 @@ namespace FNPlugin.Powermanagement
 
         public override void OnFixedUpdateResourceSuppliable(double fixedDeltaTime)
         {
+            _backgroundReady = true;
             if (IsEnabled && _attachedPowerSource != null && FNRadiator.HasRadiatorsForVessel(vessel))
             {
                 _appliesBalance = _attachedPowerSource.ShouldApplyBalance(chargedParticleMode ? ElectricGeneratorType.charged_particle : ElectricGeneratorType.thermal);

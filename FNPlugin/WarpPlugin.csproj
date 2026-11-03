@@ -89,6 +89,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Animate\FNLightSwitch.cs" />
+    <Compile Include="Background\BackgroundSnapshot.cs" />
+    <Compile Include="Background\Core\BackgroundSpecs.cs" />
+    <Compile Include="Background\Core\ElectricDemand.cs" />
+    <Compile Include="Background\Core\SteadyStateSolver.cs" />
+    <Compile Include="Background\InterstellarBackgroundPower.cs" />
     <Compile Include="Beamedpower\BeamedPowerTransmitterTag.cs" />
     <Compile Include="Beamedpower\InterstellarBeamedPowerHelper.cs" />
     <Compile Include="GameEventSubscriber.cs" />

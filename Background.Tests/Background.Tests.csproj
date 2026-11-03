@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Tests of the background (rails warp) model of the fork: files under FNPlugin/Background/Core reference no
+    KSP or Unity assembly and are linked in here. Run: dotnet test KSPMods/KSPIE/Background.Tests
+    Not part of WarpPlugin.sln: build.ps1 builds the plugin only.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\FNPlugin\Background\Core\*.cs" Link="Linked\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

@@ -36,6 +36,9 @@ namespace FNPlugin.Reactors
         public double MinimumChargdIspMult => minimumChargedIspMult;
         public override double MaximumThermalPower => Math.Max(base.MaximumThermalPower * PlasmaModifier * lithium_modifier, 0);
         public override double MaximumChargedPower => base.MaximumChargedPower * PlasmaModifier;
+        // the plasma needs electric power (PowerRequirement, different per reactor type): the background model does
+        // not run that yet, so fusion reactors keep their own catch-up on load
+        protected override bool CanRunInBackground => false;
         public override bool IsFuelNeutronRich => !CurrentFuelMode.Aneutronic && CurrentFuelMode.NeutronsRatio > 0;
         public double NormalizedPowerRequirement => PowerRequirement * CurrentFuelMode.NormalizedPowerRequirements;
 

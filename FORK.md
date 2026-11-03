@@ -51,6 +51,25 @@ commit `3b495342` (upstream master on 2026-10-31).
   capacity); on load, a mode with no fuel capacity switches to a mode the part has tanks for (KANDL defaults to a
   uranium mode but carries Pu-238), otherwise its capacity is restored without adding fuel.
   The fuel mode is restored by name, not by its index in the tech-dependent mode list (upstream #670).
+- Background power with Kerbalism (`FNPlugin/Background/`, `GameData/WarpPlugin/Patches/BackgroundPower.cfg`): an
+  unloaded vessel's reactors, generators and radiators run in Kerbalism's background step at their steady operating
+  point instead of not at all. Upstream, an unloaded KSPIE vessel made no ElectricCharge (Kerbalism only saw its
+  consumption) and the reactor billed all the fuel at once when the vessel was loaded again. The reactor, generator
+  and radiator modules write what they computed while loaded into the save (`bg*` keys, flight only);
+  `InterstellarBackgroundPower` (added to every reactor part, only with Kerbalism) finds the heat balance (radiator
+  temperature, generator efficiency, minimum throttle) for the vessel's electric demand, burns the fuel, makes the
+  products, breeds tritium and moves the reactor's own catch-up time forward. The electric demand of the rest of the
+  vessel is measured from the battery between steps (held at 98%). The model (`Background/Core`) references no KSP
+  assembly and is tested by `Background.Tests` (`dotnet test`). A vessel gets it after one load with this version.
+  A reactor is run by the model completely or not at all: reactors whose power also goes where the model does not
+  follow keep their own catch-up on load — fusion reactors (plasma upkeep power), reactors with an MHD generator or
+  no generator (engines), every reactor of a vessel with a beamed power transmitter on, and fuel modes run by a
+  Kerbalism process. The stock ModuleGenerator that FNGenerator switches on is switched off in the snapshot of a
+  modelled generator's part: Kerbalism's own background made its config output for free (2000 EC/s on the liquid
+  metal reactor) on top of the reactor. Not modelled: ISRU and other MJ consumers, convection in an atmosphere,
+  radioactive decay of stored resources; a fuel or product kept inside the reactor (consumeGlobal / produceGlobal =
+  false) stops the reactor or is dropped when the reactor's own store is empty or full, but Kerbalism takes and puts
+  them in any tank of the vessel.
 - `InterstellarReactor.OnStart`: the power slider's minimum is set only when the control is a slider. In game a
   molten salt reactor had `UI_Label` controls there (cause not found); the NullReferenceException aborted OnStart and
   the reactor threw on every FixedUpdate.

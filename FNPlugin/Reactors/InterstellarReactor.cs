@@ -1533,6 +1533,7 @@ namespace FNPlugin.Reactors
             // process more than MaxResourceProcessingTimewarp seconds per update, so billing fuel for
             // the raw TimeWarp.fixedDeltaTime consumes fuel for energy that is never delivered.
             double timeWarpFixedDeltaTime = Math.Min(PluginSettings.Config.MaxResourceProcessingTimewarp, (double)(decimal)TimeWarp.fixedDeltaTime);
+            _backgroundReady = true;
             if (!IsEnabled && !IsStarted)
             {
                 IsStarted = true;
@@ -2335,6 +2336,102 @@ namespace FNPlugin.Reactors
             {
                 sb.Append(" (<color=orange>").Append((value * 100.0).ToString("F0")).Append("%</color>)");
             }
+        }
+
+        // background model (Background/InterstellarBackgroundPower): values kept from load until the reactor has run
+        private ConfigNode _loadedBackgroundValues;
+        private bool _backgroundReady;
+        private bool _backgroundErrorLogged;
+
+        /// <summary>Fusion reactors need electric power to keep their plasma (PowerRequirement): not modelled yet.</summary>
+        protected virtual bool CanRunInBackground => true;
+
+        public override void OnLoad(ConfigNode node)
+        {
+            base.OnLoad(node);
+            _loadedBackgroundValues = Background.BackgroundSnapshot.CopyBackgroundValues(node);
+        }
+
+        public override void OnSave(ConfigNode node)
+        {
+            base.OnSave(node);
+            if (HighLogic.LoadedSceneIsFlight)
+                Background.BackgroundSnapshot.Save(this, node, _backgroundReady, _loadedBackgroundValues, SaveBackgroundValues, ref _backgroundErrorLogged);
+        }
+
+        /// <summary>
+        /// What the background model needs to run this reactor while the vessel is unloaded. Maximum powers are the
+        /// reactor's own MaximumThermalPower / MaximumChargedPower (subclass factors included) with the momentary gee
+        /// force and overheat modifiers divided out: the model finds the heat balance itself.
+        /// </summary>
+        private void SaveBackgroundValues(ConfigNode node)
+        {
+            node.SetValue(Background.BackgroundSnapshot.ReactorMarker, "True", true);
+            // the fields, not the CurrentFuelMode getter: on a reactor whose start failed the getter resets the fuel mode
+            var variant = currentFuelVariant;
+            if (_currentFuelMode == null || variant == null || !CanRunInBackground || !IsEnabled)
+            {
+                node.SetValue(Background.BackgroundSnapshot.Active, "False", true);
+                return;
+            }
+
+            // what the reactor can supply (and bills fuel for): the part of the power lost in the reactor
+            // (lostThermalPowerRatio 0.975 on antimatter cores) is neither delivered nor burnt, as in OnFixedUpdate
+            var momentary = geeForceModifier * overheatModifier;
+            var thermal = momentary > 1e-6 ? MaximumThermalPower / momentary * (1 - lostThermalPowerRatio) : 0;
+            var charged = momentary > 1e-6 ? MaximumChargedPower / momentary * (1 - lostChargedPowerRatio) : 0;
+            node.SetValue(Background.BackgroundSnapshot.Active, (thermal + charged > 0).ToString(), true);
+            node.SetValue(Background.BackgroundSnapshot.ThermalMW, Background.BackgroundSnapshot.Number(thermal), true);
+            node.SetValue(Background.BackgroundSnapshot.ChargedMW, Background.BackgroundSnapshot.Number(charged), true);
+            node.SetValue(Background.BackgroundSnapshot.HotBathK, Background.BackgroundSnapshot.Number(HotBathTemperature), true);
+            node.SetValue(Background.BackgroundSnapshot.MinimumThrottle, Background.BackgroundSnapshot.Number(Math.Max(MinimumThrottle, ForcedMinimumThrottleRatio)), true);
+            node.SetValue(Background.BackgroundSnapshot.ChargedWasteHeat, chargedPowerProducesWasteheat.ToString(), true);
+            node.SetValue(Background.BackgroundSnapshot.OverheatFill, Background.BackgroundSnapshot.Number(hasOverheatEffects ? overheatThreshHold : 1), true);
+
+            // Same amounts per MJ as ConsumeReactorFuel / ProduceReactorProduct. Written even with the infinite fuel
+            // cheat on: the background step checks the cheat itself, a save must not keep it.
+            var fuels = new List<KeyValuePair<string, double>>();
+            var localFuels = new List<string>();
+            var products = new List<KeyValuePair<string, double>>();
+            var localProducts = new List<string>();
+            if (FuelEfficiency > 0 && !simulateConsumption)
+            {
+                foreach (var fuel in variant.ReactorFuels.Where(f => !f.Simulate))
+                {
+                    fuels.Add(new KeyValuePair<string, double>(fuel.ResourceName, fuel.AmountFuelUsePerMj * fuelUsePerMJMult / FuelEfficiency));
+                    if (!fuel.ConsumeGlobal)
+                        localFuels.Add(fuel.ResourceName);
+                }
+                foreach (var product in variant.ReactorProducts.Where(p => !p.Simulate))
+                {
+                    products.Add(new KeyValuePair<string, double>(product.ResourceName, product.AmountProductUsePerMj * fuelUsePerMJMult / FuelEfficiency));
+                    if (!product.ProduceGlobal)
+                        localProducts.Add(product.ResourceName);
+                }
+            }
+            node.SetValue(Background.BackgroundSnapshot.Fuels, Background.BackgroundSnapshot.FlowList(fuels), true);
+            node.SetValue(Background.BackgroundSnapshot.LocalFuels, string.Join(";", localFuels), true);
+            node.SetValue(Background.BackgroundSnapshot.Products, Background.BackgroundSnapshot.FlowList(products), true);
+            node.SetValue(Background.BackgroundSnapshot.LocalProducts, string.Join(";", localProducts), true);
+
+            // Tritium breeding as BreedTritium does it, per MJ of total power (it runs on the thermal part); not when a
+            // Kerbalism process (_Lithium6Breeder) does the breeding
+            var breedingInputs = new List<KeyValuePair<string, double>>();
+            var breedingOutputs = new List<KeyValuePair<string, double>>();
+            var lithium = part.Resources[ResourceSettings.Config.Lithium6];
+            if (breedtritium && lithium != null && lithium.maxAmount > 0 && part.Resources["_Lithium6Breeder"] == null && _lithium6Density > 0)
+            {
+                var absorption = Math.Max(0.01, Math.Sqrt(lithium.amount / lithium.maxAmount) - 0.0001);
+                var lithiumPerMJ = _currentFuelMode.TritiumBreedModifier * _currentFuelMode.NeutronsRatio * _staticBreedRate * absorption / _lithium6Density * ThermalPowerRatio;
+                if (lithiumPerMJ > 0)
+                {
+                    breedingInputs.Add(new KeyValuePair<string, double>(ResourceSettings.Config.Lithium6, lithiumPerMJ));
+                    breedingOutputs.Add(new KeyValuePair<string, double>(ResourceSettings.Config.TritiumGas, lithiumPerMJ * _tritiumBreedingMassAdjustment));
+                    breedingOutputs.Add(new KeyValuePair<string, double>(ResourceSettings.Config.Helium4Gas, lithiumPerMJ * _heliumBreedingMassAdjustment));
+                }
+            }
+            node.SetValue(Background.BackgroundSnapshot.BreedingInputs, Background.BackgroundSnapshot.FlowList(breedingInputs), true);
+            node.SetValue(Background.BackgroundSnapshot.BreedingOutputs, Background.BackgroundSnapshot.FlowList(breedingOutputs), true);
         }
 
         protected void DoPersistentResourceUpdate()

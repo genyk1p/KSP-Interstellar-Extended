@@ -811,6 +811,42 @@ namespace FNPlugin.Wasteheat
 
         public double MaxRadiatorTemperature => maxRadiatorTemperature;
 
+        // background model (Background/InterstellarBackgroundPower): values kept from load until the radiator has run
+        private ConfigNode _loadedBackgroundValues;
+        private bool _backgroundReady;
+        private bool _backgroundErrorLogged;
+
+        public override void OnLoad(ConfigNode node)
+        {
+            base.OnLoad(node);
+            _loadedBackgroundValues = Background.BackgroundSnapshot.CopyBackgroundValues(node);
+        }
+
+        public override void OnSave(ConfigNode node)
+        {
+            base.OnSave(node);
+            if (HighLogic.LoadedSceneIsFlight)
+                Background.BackgroundSnapshot.Save(this, node, _backgroundReady, _loadedBackgroundValues, SaveBackgroundValues, ref _backgroundErrorLogged);
+        }
+
+        /// <summary>
+        /// Radiation only: convection in an atmosphere is not in the model. The temperature radiated against is the
+        /// one FixedUpdate uses (atmosphere temperature × min(1, √density), at least space temperature), as at save time.
+        /// </summary>
+        private void SaveBackgroundValues(ConfigNode node)
+        {
+            var atmosphere = vessel != null && vessel.atmDensity > 0 ? Math.Sqrt(vessel.atmDensity) : 0;
+            var external = Math.Max(GetExternalTemp() * Math.Min(1, atmosphere), PhysicsGlobals.SpaceTemperature);
+            node.SetValue(Background.BackgroundSnapshot.RadiatorMarker, "True", true);
+            node.SetValue(Background.BackgroundSnapshot.Active, canRadiateHeat.ToString(), true);
+            node.SetValue(Background.BackgroundSnapshot.StefanArea, Background.BackgroundSnapshot.Number(PhysicsGlobals.StefanBoltzmanConstant * EffectiveRadiatorArea * 1e-6), true);
+            node.SetValue(Background.BackgroundSnapshot.MaxTemperature, Background.BackgroundSnapshot.Number(maxRadiatorTemperature), true);
+            node.SetValue(Background.BackgroundSnapshot.EnvironmentMax, Background.BackgroundSnapshot.Number(maxCurrentRadiatorTemperature), true);
+            node.SetValue(Background.BackgroundSnapshot.ExternalK, Background.BackgroundSnapshot.Number(external), true);
+            node.SetValue(Background.BackgroundSnapshot.Mass, Background.BackgroundSnapshot.Number(part.mass), true);
+            node.SetValue(Background.BackgroundSnapshot.Enabled, radiatorIsEnabled.ToString(), true);
+        }
+
         public static void InitializeTemperatureColorChannels()
         {
             if (_redTempColorChannel != null)
@@ -1549,6 +1585,8 @@ namespace FNPlugin.Wasteheat
             {
                 if (!HighLogic.LoadedSceneIsFlight)
                     return;
+
+                _backgroundReady = true;
 
                 if (!_active)
                     base.OnFixedUpdate();
