@@ -116,12 +116,12 @@ namespace Background.Tests
         }
 
         [Test]
-        public void DisabledRadiator_ShedsHalf()
+        public void DisabledRadiator_ShedsNothing()
         {
             var spec = Single(1000, 3000, 100, 1500);
-            var on = SteadyStateSolver.Radiated(spec, 0.5);
+            Assert.That(SteadyStateSolver.Radiated(spec, 0.5), Is.GreaterThan(0));
             spec.Radiators[0].Enabled = false;
-            Assert.That(SteadyStateSolver.Radiated(spec, 0.5), Is.EqualTo(on / 2).Within(1e-12));
+            Assert.That(SteadyStateSolver.Radiated(spec, 0.5), Is.EqualTo(0));
         }
 
         [TestCase("ThermalMW")]

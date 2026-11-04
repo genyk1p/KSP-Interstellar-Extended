@@ -245,6 +245,7 @@
     <Compile Include="Refinery\Activity\SabatierReactor.cs" />
     <Compile Include="Science\ScienceModule.cs" />
     <Compile Include="Refinery\Activity\UF4Ammonolysiser.cs" />
+    <Compile Include="Wasteheat\EditorHeat.cs" />
     <Compile Include="Wasteheat\VABThermalUI.cs" />
     <Compile Include="Science\VanAllen.cs" />
     <Compile Include="Powermanagement\FNGenerator.cs" />

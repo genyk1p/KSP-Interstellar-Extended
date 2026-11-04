@@ -8,7 +8,8 @@ namespace FNPlugin.Background.Core
     /// radiators shed exactly the heat the reactors and generators produce, for a given electric demand.
     /// Formulas follow the loaded KSPIE code (2026-11-03, fork after 8470e204):
     /// - radiator temperature  T = min(MaxTemperature × f^0.75, EnvironmentMax)          (FNRadiator, WasteHeatResourceManager)
-    /// - radiated power        Q = (1 − (1 − f)^400) × (T − T_ext)^4 × StefanArea (× 0.5 when disabled)
+    /// - radiated power        Q = (1 − (1 − f)^400) × (T − T_ext)^4 × StefanArea (0 when disabled: retracted
+    ///                         radiators still count in the vessel's average temperature, but shed nothing)
     /// - vessel radiator temp  Σ min(1, T/MaxTemperature) × max(MaxTemperature) × mass share (FNRadiator.GetAverageRadiatorTemperatureForVessel)
     /// - thermal generator     η = MaxEfficiency × clamp(1 − 0.75 × T_vessel / HotBath)    (FNGenerator.OnFixedUpdateResourceSuppliable;
     ///                         KSPIE stops a generator below a ratio of 0.01 — the model lets η go to 0 smoothly instead,
@@ -145,7 +146,9 @@ namespace FNPlugin.Background.Core
                     var external = NonNegative(radiator.ExternalK);
                     External[k] = external > 0 ? external : defaultExternal;
                     MassShare[k] = NonNegative(radiator.Mass);
-                    RadiatorFactor[k] = radiator.Enabled ? 1 : 0.5;
+                    // FNRadiator computes half for a disabled radiator, but ConsumeWasteHeatPerSecond takes nothing
+                    // when radiatorIsEnabled is false (since 2018): a retracted radiator sheds no heat in the game.
+                    RadiatorFactor[k] = radiator.Enabled ? 1 : 0;
                     totalMass += MassShare[k];
                     VesselMaxTemperature = Math.Max(VesselMaxTemperature, MaxTemperature[k]);
                 }

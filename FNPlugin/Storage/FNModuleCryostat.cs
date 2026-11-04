@@ -154,6 +154,10 @@ namespace FNPlugin.Storage
 
             if (RuleMode)
             {
+                // Fork (cooling step 5): the same words as CryoCooling's lines on CryoTanks tanks
+                powerStatusStrField.guiName = Localizer.Format("#LOC_KSPIE_ModuleCryostat_Spend");
+                boiloffStrField.guiName = Localizer.Format("#LOC_KSPIE_ModuleCryostat_Boiloff");
+
                 // No electric charge buffer is added and no IFS Kerbalism variables: the rule bills Kerbalism (stock
                 // requests without it). A buffer an old save carries from the upstream model stays on the part; the
                 // variables are emptied, or their processes would keep running.
@@ -489,6 +493,13 @@ namespace FNPlugin.Storage
 
         private bool? _firstForResource;
 
+        /// <summary>
+        /// Fork (cooling step 5), for the editor heat window: the boiloff rate (%/h) of this cryostat's resource without
+        /// cooling under the rule (the cooling cost follows from it), or 0 — not the rule, not cryogenic, or a part's
+        /// second cryostat for the same resource (inert).
+        /// </summary>
+        internal double EditorRulePercentPerHour => RuleMode && boiloffPercentPerHour > 0 && FirstForResource() ? boiloffPercentPerHour : 0;
+
         private bool FirstForResource()
         {
             if (part != null)
@@ -738,7 +749,10 @@ namespace FNPlugin.Storage
             }
         }
 
-        /// <summary>Part window under the rule: cooling switch, its cost, the boiloff; refreshed twice a second.</summary>
+        /// <summary>
+        /// Part window under the rule: cooling switch, its cost ("Spend"), and the boiloff — what the tank would lose
+        /// without cooling while it is cooled, what it loses while it is not; refreshed twice a second.
+        /// </summary>
         private void UpdateRuleDisplay(PartResource resource)
         {
             var relevant = resource != null && boiloffPercentPerHour > 0 && Acts;
@@ -767,9 +781,11 @@ namespace FNPlugin.Storage
                 : share < 0.999
                     ? Localizer.Format("#LOC_KSPIE_ModuleCryostat_RuleShort", (cost * share).ToString("0.###"), cost.ToString("0.###"))
                     : Localizer.Format("#LOC_KSPIE_ModuleCryostat_RuleCost", cost.ToString("0.###"));
-            var boiling = CryostatRule.BoiloffPerSecond(boiloffPercentPerHour, resource.amount) * (1 - share);
-            boiloffStrField.guiActive = boiling > 0;
-            boiloffStr = Localizer.Format("#LOC_KSPIE_ModuleCryostat_RuleBoiloff", boiling.ToString("0.####"), boiloffPercentPerHour.ToString("0.####"));
+            var perHour = CryostatRule.BoiloffPerSecond(boiloffPercentPerHour, resource.amount) * 3600;
+            boiloffStrField.guiActive = perHour > 0;
+            boiloffStr = share < 0.999
+                ? Localizer.Format("#LOC_KSPIE_ModuleCryostat_RuleBoiling", (perHour * (1 - share)).ToString("0.##"), boiloffPercentPerHour.ToString("0.####"))
+                : Localizer.Format("#LOC_KSPIE_ModuleCryostat_RuleWouldBoil", boiloffPercentPerHour.ToString("0.####"), perHour.ToString("0.##"));
         }
 
         public void OnRescale(ScalingFactor factor)

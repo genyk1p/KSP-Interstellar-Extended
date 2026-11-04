@@ -155,6 +155,38 @@ commit `3b495342` (upstream master on 2026-10-31).
   DEAD (recovered or terminated in the tracking station, merged by docking): upstream they stayed listed with their
   last power and the receivers' routing threw on their destroyed transform. Until it has filled its lists on the first
   frames of a scene, a receiver keeps its last intake (kept across scenes, emptied when another save folder is loaded).
+- Clearer heat windows (cooling step 5, `todo/cooling-unification.md` in the main repo):
+  - radiator part window (`FNRadiator`): on top the cooling and automation switches, "Sheds X (up to Y at a full heat
+    bar)", the temperature against the current limit (coloured; the atmosphere limit marked), the kind and its maximum
+    temperature, and a warning only when there is one (heat bar at 95 % where the radiator can
+    explode, airflow stress, retracted, off, shielded); the rest in a collapsed "details" group. In the editor: "up to
+    X in space" (at the vacuum limit). The stock `ModuleActiveRadiator` status line ("Cooling: 5 %", stock part heat) is hidden: it read
+    like the radiator's own switch.
+  - "Vessel heat" window (`WasteHeatResourceManager`, the waste heat window of the KSPIE toolbar button; the base
+    `ResourceManager.DoWindow` is now virtual): the heat bar with marks where the vessel's own parts act — transmitters
+    throttle at 90 %, electric receivers stop at 95 %, reactors throttle at their own `overheatThreshHold` and shut down
+    at `emergencyPowerShutdownFraction` (0.95 and 0.99 by default, a gas core throttles from 0.2) —, heating and cooling
+    by part — a generator's conversion is netted against its reactor's part (KSPIE books it as the generator drawing
+    waste heat), radiators and a thermal nozzle's open-cycle cooling cool —,
+    the balance measured from the bar over a few seconds, what comes next (steady at N %, time to the next mark,
+    cooling down), and the generators' efficiency against the radiators' temperature.
+  - editor "Heat" window (`VABThermalUI`, rewritten): the vessel as the background model sees it
+    (`Wasteheat/EditorHeat.cs` → `SteadyStateSolver`, values as the modules save them for the model; radiators by
+    `FNRadiator.EditorSpec` for the chosen place). In: where (space, or the atmosphere of a body the player has reached,
+    at an altitude) and the load, as a share of the most the plant keeps up in equilibrium. Out: that power limit and
+    what sets it — the radiators (they shed no more there: temperature limit or the bar's threshold), the reactors and
+    generators at full power, or the efficiency (past it the radiators warm and the generators lose efficiency faster
+    than the power grows: asked for more, the loaded plant slides to almost no electricity) —, and at the chosen load
+    the electricity, efficiency, reactor power, heat bar and waste heat, a verdict, and what the model leaves out
+    (engines, beamed power, MHD, fusion plasma upkeep; convection in an atmosphere).
+  - cryostat window under the rule: "Spend" and "Boiloff" (what the tank would boil without cooling while cooled,
+    what it boils while not) — the same words as CryoCooling's lines on CryoTanks tanks.
+  - Russian strings for the radiator (there were none) and the new windows.
+- Background model: a retracted or disabled radiator sheds nothing, as in the game (`ConsumeWasteHeatPerSecond`
+  returns 0 for it since 2018, the half FNRadiator computes for it is never taken); the model had half. Checked
+  against the loaded game on `test_beam_tx` (2026-11-04): the plant settles where the model puts it (heat bar 25 %,
+  generator efficiency 0.20, stable supply 99.6 MW against the model's ~100 MW); the 0.152 seen earlier was the
+  minutes after a load, before the heat bar settled.
 - `InterstellarReactor.OnStart`: the power slider's minimum is set only when the control is a slider. In game a
   molten salt reactor had `UI_Label` controls there (cause not found); the NullReferenceException aborted OnStart and
   the reactor threw on every FixedUpdate.

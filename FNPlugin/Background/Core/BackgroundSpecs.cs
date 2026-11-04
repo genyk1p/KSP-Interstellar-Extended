@@ -102,7 +102,10 @@ namespace FNPlugin.Background.Core
         public double ExternalK;
         /// <summary>Part mass, t: weight of the radiator in the vessel's average radiator temperature.</summary>
         public double Mass = 1;
-        /// <summary>A retracted or disabled radiator dissipates half (FNRadiator: radiatorIsEnabled false).</summary>
+        /// <summary>
+        /// A retracted or disabled radiator (FNRadiator: radiatorIsEnabled false) sheds nothing: FNRadiator computes half,
+        /// but ConsumeWasteHeatPerSecond returns 0 for it. It still counts in the vessel's average radiator temperature.
+        /// </summary>
         public bool Enabled = true;
     }
 

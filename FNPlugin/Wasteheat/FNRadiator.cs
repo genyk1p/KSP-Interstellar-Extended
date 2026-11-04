@@ -1,3 +1,4 @@
+using FNPlugin.Background.Core;
 using FNPlugin.Constants;
 using FNPlugin.Extensions;
 using FNPlugin.Power;
@@ -654,6 +655,9 @@ namespace FNPlugin.Wasteheat
     {
         public const string GROUP = "FNRadiator";
         public const string GROUP_TITLE = "#LOC_KSPIE_Radiator_groupName";
+        // Fork (cooling step 5): the radiator window shows five plain lines; everything else is in a collapsed group.
+        public const string DETAILS_GROUP = "FNRadiatorDetails";
+        public const string DETAILS_GROUP_TITLE = "#LOC_KSPIE_Radiator_Details";
 
         // persistent
         [KSPField(isPersistant = true)] public bool radiatorInit;
@@ -666,9 +670,15 @@ namespace FNPlugin.Wasteheat
         public bool radiatorIsEnabled;
         [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, isPersistant = true, guiActive = true, guiName = "#LOC_KSPIE_Radiator_Automated"), UI_Toggle(disabledText = "#LOC_KSPIE_Radiator_Off", enabledText = "#LOC_KSPIE_Radiator_On", affectSymCounterparts = UI_Scene.All)]//Automated-Off-On
         public bool isAutomated = true;
-        [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, isPersistant = true, guiActiveEditor = true, guiActive = true, guiName = "#LOC_KSPIE_Radiator_PivotOff"), UI_Toggle(disabledText = "#LOC_KSPIE_Radiator_Off", enabledText = "#LOC_KSPIE_Radiator_On", affectSymCounterparts = UI_Scene.All)]//Pivot--Off--On
+        // Fork: what it sheds now and could shed at its current temperature limit (flight) / in space at its vacuum limit (editor)
+        [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiActive = true, guiActiveEditor = true, guiName = "#LOC_KSPIE_Radiator_Sheds")] public string shedsStr;
+        [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiActive = true, guiName = "#LOC_KSPIE_Radiator_RadiatorTemp")] public string radiatorTempStr;
+        [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiActive = true, guiActiveEditor = true, guiName = "#LOC_KSPIE_Radiator_Type")] public string kindStr;
+        // Fork: shown only while there is something to warn about
+        [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiActive = false, guiName = "#LOC_KSPIE_Radiator_Warning")] public string warningStr;
+        [KSPField(groupName = DETAILS_GROUP, groupDisplayName = DETAILS_GROUP_TITLE, groupStartCollapsed = true, isPersistant = true, guiActiveEditor = true, guiActive = true, guiName = "#LOC_KSPIE_Radiator_PivotOff"), UI_Toggle(disabledText = "#LOC_KSPIE_Radiator_Off", enabledText = "#LOC_KSPIE_Radiator_On", affectSymCounterparts = UI_Scene.All)]//Pivot--Off--On
         public bool pivotEnabled = true;
-        [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, isPersistant = true, guiActiveEditor = true, guiActive = true, guiName = "#LOC_KSPIE_Radiator_PreventShieldedDeploy"), UI_Toggle(disabledText = "#LOC_KSPIE_Radiator_Off", enabledText = "#LOC_KSPIE_Radiator_On", affectSymCounterparts = UI_Scene.All)]//Prevent Shielded Deploy-Off-On
+        [KSPField(groupName = DETAILS_GROUP, groupDisplayName = DETAILS_GROUP_TITLE, groupStartCollapsed = true, isPersistant = true, guiActiveEditor = true, guiActive = true, guiName = "#LOC_KSPIE_Radiator_PreventShieldedDeploy"), UI_Toggle(disabledText = "#LOC_KSPIE_Radiator_Off", enabledText = "#LOC_KSPIE_Radiator_On", affectSymCounterparts = UI_Scene.All)]//Prevent Shielded Deploy-Off-On
         public bool preventShieldedDeploy = true;
 
         // non persistent
@@ -680,20 +690,20 @@ namespace FNPlugin.Wasteheat
         public double maxAtmosphereTemperature = maximumRadiatorTempAtOneAtmosphere;
         [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiName = "#LOC_KSPIE_Radiator_MaxCurrentTemp", guiFormat = "F0", guiUnits = "K")]//Max Current Temp
         public double maxCurrentRadiatorTemperature = maximumRadiatorTempAtOneAtmosphere;
-        [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiActiveEditor = true, guiName = "#LOC_KSPIE_Radiator_MaxRadiatorTemperature", guiFormat = "F0", guiUnits = "K")]//Max Radiator Temperature
+        [KSPField(groupName = DETAILS_GROUP, groupDisplayName = DETAILS_GROUP_TITLE, groupStartCollapsed = true, guiActiveEditor = true, guiName = "#LOC_KSPIE_Radiator_MaxRadiatorTemperature", guiFormat = "F0", guiUnits = "K")]//Max Radiator Temperature
         public double maxRadiatorTemperature = _maximumRadiatorTempInSpace;
         [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiName = "#LOC_KSPIE_Radiator_SpaceRadiatorBonus", guiFormat = "F0", guiUnits = "K")]//Space Radiator Bonus
         public double spaceRadiatorBonus;
-        [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiName = "#LOC_KSPIE_Radiator_Mass", guiUnits = " t", guiFormat = "F3")]//Mass
+        [KSPField(groupName = DETAILS_GROUP, groupDisplayName = DETAILS_GROUP_TITLE, groupStartCollapsed = true, guiName = "#LOC_KSPIE_Radiator_Mass", guiUnits = " t", guiFormat = "F3")]//Mass
         public float partMass;
-        [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiActiveEditor = true, guiName = "#LOC_KSPIE_Radiator_ConverctionBonus", guiUnits = "x", guiFormat = "F3")]//Converction Bonus
+        [KSPField(groupName = DETAILS_GROUP, groupDisplayName = DETAILS_GROUP_TITLE, groupStartCollapsed = true, guiActiveEditor = true, guiName = "#LOC_KSPIE_Radiator_ConverctionBonus", guiUnits = "x", guiFormat = "F3")]//Converction Bonus
         public double convectiveBonus = 1;
 
         [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiName = "#LOC_KSPIE_Radiator_EffectiveArea", guiFormat = "F1", guiUnits = " m\xB2")]//Effective Area
         public double effectiveRadiatorArea;
         [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiName = "#LOC_KSPIE_Radiator_SurfaceArea", guiFormat = "F2", guiUnits = " m\xB2")]//Surface Area
         public double radiatorArea;
-        [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiActiveEditor = true, guiActive = true, guiName = "#LOC_KSPIE_Radiator_SurfaceArea", guiFormat = "F3", guiUnits = " m\xB2")]//Surface Area
+        [KSPField(groupName = DETAILS_GROUP, groupDisplayName = DETAILS_GROUP_TITLE, groupStartCollapsed = true, guiActiveEditor = true, guiActive = true, guiName = "#LOC_KSPIE_Radiator_SurfaceArea", guiFormat = "F3", guiUnits = " m\xB2")]//Surface Area
         public double baseRadiatorArea;
 
         [KSPField] public string radiatorTypeMk1 = Localizer.Format("#LOC_KSPIE_Radiator_radiatorTypeMk1");//NaK Loop Radiator
@@ -732,13 +742,12 @@ namespace FNPlugin.Wasteheat
         [KSPField] public int DEPLOYMENT_DELAY = 6;
         [KSPField] public float drapperPoint = 500; // 798
 
-        [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiActive = true, guiName = "#LOC_KSPIE_Radiator_RadiatorTemp")] public string radiatorTempStr;
-        [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiActive = true, guiName = "#LOC_KSPIE_Radiator_PartTemp")] public string partTempStr;
-        [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiActive = true, guiName = "#LOC_KSPIE_Radiator_PowerRadiated")] public string thermalPowerDissipStr;
-        [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiActive = true, guiName = "#LOC_KSPIE_Radiator_PowerConvected")] public string thermalPowerConvStr;
+        [KSPField(groupName = DETAILS_GROUP, groupDisplayName = DETAILS_GROUP_TITLE, groupStartCollapsed = true, guiActive = true, guiName = "#LOC_KSPIE_Radiator_PartTemp")] public string partTempStr;
+        [KSPField(groupName = DETAILS_GROUP, groupDisplayName = DETAILS_GROUP_TITLE, groupStartCollapsed = true, guiActive = true, guiName = "#LOC_KSPIE_Radiator_PowerRadiated")] public string thermalPowerDissipStr;
+        [KSPField(groupName = DETAILS_GROUP, groupDisplayName = DETAILS_GROUP_TITLE, groupStartCollapsed = true, guiActive = true, guiName = "#LOC_KSPIE_Radiator_PowerConvected")] public string thermalPowerConvStr;
         [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiName = "#LOC_KSPIE_Radiator_RadUpgradeCost")] public string upgradeCostStr;
         [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiName = "#LOC_KSPIE_Radiator_RadiatorStartTemp")] public double radiatorTemperatureTempVal;
-        [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiName = "#LOC_KSPIE_Radiator_DynamicPressureStress", guiActive = true, guiFormat = "P2")] public double dynamicPressureStress;
+        [KSPField(groupName = DETAILS_GROUP, groupDisplayName = DETAILS_GROUP_TITLE, groupStartCollapsed = true, guiName = "#LOC_KSPIE_Radiator_DynamicPressureStress", guiActive = true, guiFormat = "P2")] public double dynamicPressureStress;
         [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiName = "#LOC_KSPIE_Radiator_MaxEnergyTransfer", guiFormat = "F2")] private double _maxEnergyTransfer;
         [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiName = "Part Rotation Distance", guiFormat = "F2", guiUnits = "m/s")] public double partRotationDistance;
         [KSPField(groupName = GROUP, groupDisplayName = GROUP_TITLE, guiName = "Atmosphere Density", guiFormat = "F2", guiUnits = "")] public double atmDensity;
@@ -774,6 +783,14 @@ namespace FNPlugin.Wasteheat
 
         private int _radiatorDeployDelay;
         private int _explodeCounter;
+
+        // Fork (cooling step 5): set in FixedUpdate, shown by UpdateWindowLines
+        private double _possibleRadiated;
+        private double _possibleConvected;
+        private double _wasteHeatFill;
+        private bool _convectionHeats; // the air is warmer than the radiator: _convectedThermalPower is heat taken in
+        private float _nextWindowLines;
+        private BaseField _warningField;
 
         private BaseEvent _deployRadiatorEvent;
         private BaseEvent _retractRadiatorEvent;
@@ -1269,6 +1286,7 @@ namespace FNPlugin.Wasteheat
             _radiatorIsEnabledField = Fields[nameof(radiatorIsEnabled)];
             _isAutomatedField = Fields[nameof(isAutomated)];
             _pivotEnabledField = Fields[nameof(pivotEnabled)];
+            _warningField = Fields[nameof(warningStr)];
 
             var preventDeployField = Fields[nameof(preventShieldedDeploy)];
             preventDeployField.guiActive = isDeployable;
@@ -1311,6 +1329,12 @@ namespace FNPlugin.Wasteheat
             {
                 _moduleActiveRadiator.Events[nameof(_moduleActiveRadiator.Activate)].guiActive = false;
                 _moduleActiveRadiator.Events[nameof(_moduleActiveRadiator.Shutdown)].guiActive = false;
+
+                // Fork: the stock "Cooling: 5 %" line is about stock part heat, not the KSPIE heat bar, and reads like
+                // the radiator's own switch: hidden (moved into our details group it put that group above the main one)
+                var stockStatus = _moduleActiveRadiator.Fields["status"];
+                if (stockStatus != null)
+                    stockStatus.guiActive = stockStatus.guiActiveEditor = false;
             }
             _moduleDeployableRadiator = part.FindModuleImplementing<ModuleDeployableRadiator>();
             if (_moduleDeployableRadiator != null)
@@ -1451,6 +1475,112 @@ namespace FNPlugin.Wasteheat
 
             _deployRadiatorEvent.active = canBeActive && !radiatorIsEnabled;
             _retractRadiatorEvent.active = canBeActive && radiatorIsEnabled;
+
+            if (HighLogic.LoadedSceneIsEditor && Time.unscaledTime >= _nextWindowLines)
+            {
+                _nextWindowLines = Time.unscaledTime + 0.25f;
+                UpdateEditorLines();
+            }
+        }
+
+        // Fork (cooling step 5): the plain lines of the radiator window in flight — what it sheds of what it could,
+        // its temperature against the current limit, its kind, and a warning only when there is one.
+        private void UpdateWindowLines()
+        {
+            // convection from air warmer than the radiator adds heat (FixedUpdate supplies it): it counts against
+            var shedding = radiatorIsEnabled && canRadiateHeat
+                ? _radiatedThermalPower + (_convectionHeats ? -_convectedThermalPower : _convectedThermalPower)
+                : 0;
+            shedsStr = Localizer.Format("#LOC_KSPIE_Radiator_ShedsValue",
+                PluginHelper.GetFormattedPowerString(shedding), PluginHelper.GetFormattedPowerString(_possibleRadiated + _possibleConvected));
+
+            // an oxygen atmosphere lowers the limit below the vacuum one (UpdateMaxCurrentTemperature)
+            var atmosphereLimited = maxCurrentRadiatorTemperature < maxVacuumTemperature - 0.5;
+            var temperature = Localizer.Format(atmosphereLimited ? "#LOC_KSPIE_Radiator_TempAtmosphere" : "#LOC_KSPIE_Radiator_TempValue",
+                CurrentRadiatorTemperature.ToString("F0"), maxCurrentRadiatorTemperature.ToString("F0"));
+            var ratio = maxCurrentRadiatorTemperature > 0 ? CurrentRadiatorTemperature / maxCurrentRadiatorTemperature : 0;
+            radiatorTempStr = ratio >= 0.95 ? "<color=#FF6060>" + temperature + "</color>"
+                : ratio >= 0.8 ? "<color=#FFD24D>" + temperature + "</color>"
+                : temperature;
+
+            kindStr = Localizer.Format("#LOC_KSPIE_Radiator_KindValue", RadiatorType, maxRadiatorTemperature.ToString("F0"));
+
+            // FixedUpdate explodes a radiator at a full bar once it reaches maxRadiatorTemperature; the current limit
+            // (atmosphere, or a non-graphene radiator's vacuum cap) can keep it below that
+            var canExplode = !CheatOptions.IgnoreMaxTemperature && radiatorIsEnabled && maxCurrentRadiatorTemperature >= maxRadiatorTemperature;
+            string warning = null;
+            if (canExplode && _wasteHeatFill >= 0.95)
+                warning = Localizer.Format("#LOC_KSPIE_Radiator_WarnHeatBar", (_wasteHeatFill * 100).ToString("F0"));
+            else if (isDeployable && radiatorIsEnabled && dynamicPressureStress >= 0.5) // DeploymentControl acts at 1
+                warning = Localizer.Format("#LOC_KSPIE_Radiator_WarnPressure", (dynamicPressureStress * 100).ToString("F0"),
+                    Localizer.Format(isAutomated ? "#LOC_KSPIE_Radiator_WarnRetracts" : "#LOC_KSPIE_Radiator_WarnBreaksOff"));
+            else if (!radiatorIsEnabled && canRadiateHeat)
+                warning = Localizer.Format(!isDeployable ? "#LOC_KSPIE_Radiator_WarnOff"
+                    : isAutomated && preventShieldedDeploy && part.ShieldedFromAirstream ? "#LOC_KSPIE_Radiator_WarnShielded"
+                    : "#LOC_KSPIE_Radiator_WarnRetracted");
+
+            warningStr = warning == null ? string.Empty : "<color=#FFA040>" + warning + "</color>";
+            if (_warningField != null)
+                _warningField.guiActive = warning != null;
+        }
+
+        /// <summary>
+        /// Fork (cooling step 5): this radiator for the editor heat window (EditorHeat), as SaveBackgroundValues
+        /// writes it in flight, for a chosen place: space (<paramref name="body"/> null or above its atmosphere) or an
+        /// atmosphere at <paramref name="altitude"/>, at rest (UpdateMaxCurrentTemperature without airspeed and
+        /// vertical speed). Deployed. Null when it cannot radiate.
+        /// </summary>
+        internal RadiatorSpec EditorSpec(CelestialBody body, double altitude)
+        {
+            if (!canRadiateHeat) return null;
+
+            // the limits OnStart sets in flight
+            var vacuumLimit = IsGraphene ? Math.Min(maxVacuumTemperature, maxRadiatorTemperature) : Math.Min(RadiatorProperties.RadiatorTemperatureMk4, maxRadiatorTemperature);
+            var atmosphereLimit = IsGraphene ? Math.Min(maxAtmosphereTemperature, maxRadiatorTemperature) : Math.Min(RadiatorProperties.RadiatorTemperatureMk3, maxRadiatorTemperature);
+
+            var limit = vacuumLimit;
+            var external = PhysicsGlobals.SpaceTemperature;
+            if (body != null && body.atmosphere && altitude < body.atmosphereDepth)
+            {
+                var pressure = body.GetPressure(Math.Max(0, altitude));
+                var temperature = body.GetTemperature(Math.Max(0, altitude));
+                var density = body.GetDensity(pressure, temperature);
+                if (body.atmosphereContainsOxygen && pressure > 0)
+                {
+                    double oxidationModifier;
+                    if (pressure > GameConstants.EarthAtmospherePressureAtSeaLevel)
+                    {
+                        var ratio = (pressure - GameConstants.EarthAtmospherePressureAtSeaLevel) / GameConstants.EarthAtmospherePressureAtSeaLevel;
+                        oxidationModifier = 1 + (ratio <= 1 ? ratio * ratio : Math.Sqrt(ratio)) * 0.1;
+                    }
+                    else
+                        oxidationModifier = Math.Pow(pressure / GameConstants.EarthAtmospherePressureAtSeaLevel, 0.25);
+
+                    var bonus = (1 / 0.95) * _maxSpaceTempBonus * (1 - oxidationModifier);
+                    limit = Math.Min(vacuumLimit, Math.Max(PhysicsGlobals.SpaceTemperature, atmosphereLimit + bonus));
+                }
+                external = Math.Max(temperature * Math.Min(1, Math.Sqrt(Math.Max(0, density))), PhysicsGlobals.SpaceTemperature);
+            }
+
+            return new RadiatorSpec
+            {
+                StefanArea = PhysicsGlobals.StefanBoltzmanConstant * EffectiveRadiatorArea * 1e-6,
+                MaxTemperatureK = maxRadiatorTemperature,
+                EnvironmentMaxK = limit,
+                ExternalK = external,
+                Mass = part.mass,
+                Enabled = true
+            };
+        }
+
+        // Fork (cooling step 5): in the editor — what it sheds in space with a full heat bar at its vacuum limit
+        private void UpdateEditorLines()
+        {
+            var vacuumLimit = IsGraphene ? Math.Min(maxVacuumTemperature, maxRadiatorTemperature) : Math.Min(RadiatorProperties.RadiatorTemperatureMk4, maxRadiatorTemperature);
+            var deltaT = Math.Max(0, vacuumLimit - PhysicsGlobals.SpaceTemperature);
+            var inSpace = PhysicsGlobals.StefanBoltzmanConstant * EffectiveRadiatorArea * 1e-6 * deltaT * deltaT * deltaT * deltaT;
+            shedsStr = Localizer.Format("#LOC_KSPIE_Radiator_ShedsEditor", PluginHelper.GetFormattedPowerString(inSpace), vacuumLimit.ToString("F0"));
+            kindStr = Localizer.Format("#LOC_KSPIE_Radiator_KindValue", RadiatorType, maxRadiatorTemperature.ToString("F0"));
         }
 
         public override void OnUpdate() // is called while in flight
@@ -1510,7 +1640,12 @@ namespace FNPlugin.Wasteheat
                 thermalPowerConvStr = Localizer.Format("#LOC_KSPIE_Radiator_disabled");//"disabled"
             }
 
-            radiatorTempStr = CurrentRadiatorTemperature.ToString("0.0") + "K / " + maxCurrentRadiatorTemperature.ToString("0.0") + "K";
+            // a handful of strings per radiator: 4 times a second is plenty, not every frame of every radiator
+            if (Time.unscaledTime >= _nextWindowLines)
+            {
+                _nextWindowLines = Time.unscaledTime + 0.25f;
+                UpdateWindowLines();
+            }
 
             partTempStr = Math.Max(part.skinTemperature, part.temperature).ToString("0.0") + "K / " + part.maxTemp.ToString("0.0") + "K";
 
@@ -1613,8 +1748,14 @@ namespace FNPlugin.Wasteheat
                 // ToDo replace wasteheatManager.SqrtResourceBarRatioBegin by ResourceBarRatioBegin after generators hot bath takes into account expected temperature
                 radiatorTemperatureTempVal = Math.Min(maxRadiatorTemperature * wasteheatManager.TemperatureRatio, maxCurrentRadiatorTemperature);
 
-                deltaTemp = Math.Max(radiatorTemperatureTempVal - Math.Max(GetExternalTemp() * Math.Min(1, wasteheatManager.AtmosphericMultiplier), PhysicsGlobals.SpaceTemperature), 0);
+                var radiationSinkTemperature = Math.Max(GetExternalTemp() * Math.Min(1, wasteheatManager.AtmosphericMultiplier), PhysicsGlobals.SpaceTemperature);
+                deltaTemp = Math.Max(radiatorTemperatureTempVal - radiationSinkTemperature, 0);
                 var deltaTempToPowerFour = deltaTemp * deltaTemp * deltaTemp * deltaTemp;
+
+                // Fork: what it would radiate with a full heat bar at its current temperature limit (radiator window)
+                _wasteHeatFill = wasteheatManager.ResourceFillFraction;
+                var deltaTempAtLimit = Math.Max(maxCurrentRadiatorTemperature - radiationSinkTemperature, 0);
+                _possibleRadiated = canRadiateHeat ? deltaTempAtLimit * deltaTempAtLimit * deltaTempAtLimit * deltaTempAtLimit * _stefanArea : 0;
 
                 if (radiatorIsEnabled)
                 {
@@ -1659,18 +1800,37 @@ namespace FNPlugin.Wasteheat
                 {
                     atmDensity = AtmDensity();
 
+                    var externalTemperature = GetExternalTemp();
+                    var effectiveVesselSpeed = vessel.speed.Sqrt();
+                    var rotationModifier = PartRotationDistance().Sqrt();
+
                     var convPowerDissipation = CalculateConvPowerDissipation(
                         radiatorSurfaceArea : radiatorArea,
                         radiatorConvectiveBonus: convectiveBonus,
                         radiatorTemperature: CurrentRadiatorTemperature,
-                        externalTemperature: GetExternalTemp(),
+                        externalTemperature: externalTemperature,
                         atmosphericDensity: atmDensity,
                         grapheneRadiatorRatio: IsGraphene ? 1 : 0,
                         submergedPortion: part.submergedPortion,
                         convectionMultiplier: wasteHeatMultiplier,
-                        effectiveVesselSpeed:  vessel.speed.Sqrt(),
-                        rotationModifier: PartRotationDistance().Sqrt()
+                        effectiveVesselSpeed: effectiveVesselSpeed,
+                        rotationModifier: rotationModifier
                         );
+
+                    // Fork: the same at the current temperature limit (radiator window)
+                    _possibleConvected = canRadiateHeat
+                        ? Math.Max(0, CalculateConvPowerDissipation(
+                            radiatorSurfaceArea: radiatorArea,
+                            radiatorConvectiveBonus: convectiveBonus,
+                            radiatorTemperature: maxCurrentRadiatorTemperature,
+                            externalTemperature: externalTemperature,
+                            atmosphericDensity: atmDensity,
+                            grapheneRadiatorRatio: IsGraphene ? 1 : 0,
+                            submergedPortion: part.submergedPortion,
+                            convectionMultiplier: wasteHeatMultiplier,
+                            effectiveVesselSpeed: effectiveVesselSpeed,
+                            rotationModifier: rotationModifier))
+                        : 0;
 
                     if (!radiatorIsEnabled)
                         convPowerDissipation *= 0.2;
@@ -1680,6 +1840,7 @@ namespace FNPlugin.Wasteheat
                             ? ConsumeWasteHeatPerSecond(convPowerDissipation, wasteheatManager)
                             : SupplyManagedFnResourcePerSecond(-convPowerDissipation, ResourceSettings.Config.WasteHeatInMegawatt)
                         : 0;
+                    _convectionHeats = convPowerDissipation <= 0;
 
                     if (_radiatorDeployDelay >= DEPLOYMENT_DELAY)
                         DeploymentControl();
@@ -1687,6 +1848,8 @@ namespace FNPlugin.Wasteheat
                 else
                 {
                     _convectedThermalPower = 0;
+                    _convectionHeats = false;
+                    _possibleConvected = 0;
                     if (radiatorIsEnabled || !isAutomated || !canRadiateHeat || !showControls || _radiatorDeployDelay < DEPLOYMENT_DELAY) return;
                     Deploy();
                 }

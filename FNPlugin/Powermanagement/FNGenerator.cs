@@ -911,6 +911,12 @@ namespace FNPlugin.Powermanagement
 
         public double MaxStableMegaWattPower => RawGeneratorSourcePower * maxEfficiency ;
 
+        // Fork (cooling step 5): for the vessel heat window
+        public double CurrentEfficiency => _totalEfficiency;
+        public double MaxElectricMW => _maxElectricPowerPerSecond;
+        public bool IsThermalMode => !chargedParticleMode;
+        public bool IsWorking => IsEnabled && _attachedPowerSource != null && _maxElectricPowerPerSecond > 0;
+
         private void UpdateHeatExchangedThrustDivisor()
         {
             if (_attachedPowerSource == null || _attachedPowerSource.Radius <= 0 || radius <= 0)

@@ -61,7 +61,7 @@ namespace FNPlugin.Powermanagement
         protected readonly PartResourceDefinition resourceDefinition;
 
         private readonly int _windowId;
-        private bool renderWindow;
+        protected bool renderWindow;
 
         protected GUIStyle leftBoldLabel;
         protected GUIStyle rightBoldLabel;
@@ -71,6 +71,12 @@ namespace FNPlugin.Powermanagement
         protected GUIStyle rightAlignedLabel;
 
         protected virtual double AuxiliaryResourceDemand => 0.0;
+
+        // Fork (cooling step 5): what the last update produced and drew, per module, for a subclass's own window
+        internal List<PowerGeneratedPair> Producers => powerProducers;
+        internal List<PowerDistributionPair> Consumers => powerConsumers;
+
+        protected virtual string WindowTitle => resourceName + " " + Localizer.Format("#LOC_KSPIE_ResourceManager_title");//Management Display
 
         public long Counter { get; private set; }
 
@@ -153,11 +159,8 @@ namespace FNPlugin.Powermanagement
             return powerToExtract;
         }
 
-        protected void DoWindow(int windowId)
+        protected void EnsureStyles()
         {
-            double netChange = ResourceNetChange;
-            double netUtilization = DemandStableSupply;
-
             if (leftBoldLabel == null)
             {
                 leftBoldLabel = new GUIStyle(GUI.skin.label)
@@ -215,6 +218,14 @@ namespace FNPlugin.Powermanagement
                     alignment = TextAnchor.MiddleRight
                 };
             }
+        }
+
+        protected virtual void DoWindow(int windowId)
+        {
+            double netChange = ResourceNetChange;
+            double netUtilization = DemandStableSupply;
+
+            EnsureStyles();
 
             if (renderWindow && GUI.Button(new Rect(WindowPosition.width - 20, 2, 18, 18), "x"))
                 renderWindow = false;
@@ -490,8 +501,7 @@ namespace FNPlugin.Powermanagement
         {
             if (Vessel == FlightGlobals.ActiveVessel && renderWindow)
             {
-                string title = resourceName + " " + Localizer.Format("#LOC_KSPIE_ResourceManager_title");//Management Display
-                WindowPosition = GUILayout.Window(_windowId, WindowPosition, DoWindow, title);
+                WindowPosition = GUILayout.Window(_windowId, WindowPosition, DoWindow, WindowTitle);
             }
         }
 

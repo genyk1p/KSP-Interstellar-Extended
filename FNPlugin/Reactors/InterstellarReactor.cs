@@ -2346,6 +2346,9 @@ namespace FNPlugin.Reactors
         /// <summary>Fusion reactors need electric power to keep their plasma (PowerRequirement): not modelled yet.</summary>
         protected virtual bool CanRunInBackground => true;
 
+        /// <summary>Fork (cooling step 5): for the editor heat window, which notes what the model leaves out.</summary>
+        internal bool NeedsPlasmaUpkeep => !CanRunInBackground;
+
         public override void OnLoad(ConfigNode node)
         {
             base.OnLoad(node);
