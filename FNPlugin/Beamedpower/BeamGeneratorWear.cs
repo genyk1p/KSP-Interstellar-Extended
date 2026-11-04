@@ -45,6 +45,9 @@ namespace FNPlugin.Beamedpower
 
         public bool WearEnabled => ratedLifetimeHours > 0;
 
+        /// <summary>Efficiency before wear, % (the configuration's value; the current one until it is set).</summary>
+        internal double BaseEfficiencyPercentage => _baseEfficiencyPercentage >= 0 ? _baseEfficiencyPercentage : efficiencyPercentage;
+
         public double EffectiveLifetimeHours => ratedLifetimeHours * (HasQuality() ? qualityLifeMultiplier : 1);
 
         /// <summary>Fraction of the efficiency lost to wear.</summary>

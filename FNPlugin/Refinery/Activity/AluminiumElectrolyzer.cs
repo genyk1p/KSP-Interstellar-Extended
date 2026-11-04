@@ -37,7 +37,7 @@ namespace FNPlugin.Refinery.Activity
             if (_aluminaResourceName == null || _aluminiumResourceName == null || _oxygenResourceName == null)
                 return false;
 
-            return _part.GetConnectedResources(_aluminaResourceName).Any(rs => rs.amount > 0);
+            return _resources.GetConnectedResources(_aluminaResourceName).Any(rs => rs.amount > 0);
         }
 
         private double _effectivePowerRequirements;
@@ -61,9 +61,9 @@ namespace FNPlugin.Refinery.Activity
             _current_power = powerFraction * _effectivePowerRequirements;
 
             _current_rate = CurrentPower / EnergyPerTon;
-            _aluminaConsumptionRate = _part.RequestResource(_aluminaResourceName, _current_rate * fixedDeltaTime / _aluminaDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _aluminaDensity;
-            _aluminiumProductionRate = _part.RequestResource(_aluminiumResourceName, -_aluminaConsumptionRate * fixedDeltaTime / _aluminiumDensity, ResourceFlowMode.ALL_VESSEL) * _aluminiumDensity / fixedDeltaTime;
-            _oxygenProductionRate = _part.RequestResource(_oxygenResourceName, -GameConstants.aluminiumElectrolysisMassRatio * _aluminaConsumptionRate * fixedDeltaTime / _oxygenDensity, ResourceFlowMode.ALL_VESSEL) * _oxygenDensity / fixedDeltaTime;
+            _aluminaConsumptionRate = _resources.RequestResource(_aluminaResourceName, _current_rate * fixedDeltaTime / _aluminaDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _aluminaDensity;
+            _aluminiumProductionRate = _resources.RequestResource(_aluminiumResourceName, -_aluminaConsumptionRate * fixedDeltaTime / _aluminiumDensity, ResourceFlowMode.ALL_VESSEL) * _aluminiumDensity / fixedDeltaTime;
+            _oxygenProductionRate = _resources.RequestResource(_oxygenResourceName, -GameConstants.aluminiumElectrolysisMassRatio * _aluminaConsumptionRate * fixedDeltaTime / _oxygenDensity, ResourceFlowMode.ALL_VESSEL) * _oxygenDensity / fixedDeltaTime;
             UpdateStatusMessage();
         }
 

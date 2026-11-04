@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using FNPlugin.Constants;
 using FNPlugin.Powermanagement;
 using FNPlugin.Refinery;
 using KSP.Localization;
@@ -86,8 +88,45 @@ namespace FNPlugin.Resources
             }
         }
 
+        // background (Background/BackgroundConsumers, todo/kspie-rails-warp.md A2): values kept from load until the
+        // factory has run in this flight
+        private ConfigNode _loadedBackgroundValues;
+        private bool _backgroundReady;
+        private bool _backgroundErrorLogged;
+
+        public override void OnLoad(ConfigNode node)
+        {
+            base.OnLoad(node);
+            _loadedBackgroundValues = Background.BackgroundSnapshot.CopyBackgroundValues(node);
+        }
+
+        public override void OnSave(ConfigNode node)
+        {
+            base.OnSave(node);
+            if (HighLogic.LoadedSceneIsFlight)
+                Background.BackgroundSnapshot.Save(this, node, _backgroundReady, _loadedBackgroundValues, SaveBackgroundValues, ref _backgroundErrorLogged);
+        }
+
+        /// <summary>Power at the slider and what it makes per second (AntimatterGenerator.Produce).</summary>
+        private void SaveBackgroundValues(ConfigNode node)
+        {
+            var demand = powerPercentage * 0.01 * powerCapacity;
+            var outputs = new List<KeyValuePair<string, double>>();
+            // ReferenceEquals: the generator is a PartModule made with new, which Unity's == reports as null
+            if (!ReferenceEquals(_generator, null) && _antimatterDefinition != null && _antimatterDefinition.density > 0)
+                outputs.Add(new KeyValuePair<string, double>(_antimatterDefinition.name,
+                    demand * 1E6 / GameConstants.lightSpeedSquared / 2000 / _antimatterDefinition.density * _generator.Efficiency));
+            // megajoules only, no ElectricCharge (FixedUpdate: ConsumeFnResourcePerSecond)
+            // FixedUpdate asks for powerPercentage × min(powerCapacity, stable supply)
+            Background.BackgroundConsumers.WriteRecipe(node, isActive && outputs.Count > 0, demand, getPowerPriority(), 0, 0, false,
+                null, outputs, nameof(lastActiveTime), powerPercentage * 0.01);
+        }
+
         public void FixedUpdate()
         {
+            if (HighLogic.LoadedSceneIsFlight)
+                _backgroundReady = true;
+
             if (!isActive)
                 return;
 

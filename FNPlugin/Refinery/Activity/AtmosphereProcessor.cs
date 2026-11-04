@@ -315,26 +315,26 @@ namespace FNPlugin.Refinery.Activity
             {
                 // determine the maximum amount of a resource the vessel can hold (ie. tank capacities combined)
                 // determine how much spare room there is in the vessel's resource tanks (for the resources this is going to produce)
-                _part.GetResourceMass(_atmosphere, out _spareRoomAtmosphereMass, out _maxCapacityAtmosphereMass);
-                _part.GetResourceMass(_ammonia, out _spareRoomAmmoniaMass, out _maxCapacityAmmoniaMass);
-                _part.GetResourceMass(_argon, out _spareRoomArgonMass, out _maxCapacityArgonMass);
-                _part.GetResourceMass(_chlorine, out _spareRoomChlorineMass, out _maxCapacityChlorineMass);
-                _part.GetResourceMass(_dioxide, out _spareRoomDioxideMass, out _maxCapacityDioxideMass);
-                _part.GetResourceMass(_helium3, out _spareRoomHelium3Mass, out _maxCapacityHelium3Mass);
-                _part.GetResourceMass(_helium4, out _spareRoomHelium4Mass, out _maxCapacityHelium4Mass);
-                _part.GetResourceMass(_hydrogen, out _spareRoomHydrogenMass, out _maxCapacityHydrogenMass);
-                _part.GetResourceMass(_methane, out _spareRoomMethaneMass, out _maxCapacityMethaneMass);
-                _part.GetResourceMass(_monoxide, out _spareRoomMonoxideMass, out _maxCapacityMonoxideMass);
-                _part.GetResourceMass(_neon, out _spareRoomNeonMass, out _maxCapacityNeonMass);
-                _part.GetResourceMass(_nitrogen, out _spareRoomNitrogenMass, out _maxCapacityNitrogenMass);
-                _part.GetResourceMass(_nitrogen15, out _spareRoomNitrogen15Mass, out _maxCapacityNitrogen15Mass);
-                _part.GetResourceMass(_oxygen, out _spareRoomOxygenMass, out _maxCapacityOxygenMass);
-                _part.GetResourceMass(_water, out _spareRoomWaterMass, out _maxCapacityWaterMass);
-                _part.GetResourceMass(_heavyWater, out _spareRoomHeavyWaterMass, out _maxCapacityHeavyWaterMass);
-                _part.GetResourceMass(_xenon, out _spareRoomXenonMass, out _maxCapacityXenonMass);
-                _part.GetResourceMass(_deuterium, out _spareRoomDeuteriumMass, out _maxCapacityDeuteriumMass);
-                _part.GetResourceMass(_krypton, out _spareRoomKryptonMass, out _maxCapacityKryptonMass);
-                _part.GetResourceMass(_sodium, out _spareRoomSodiumMass, out _maxCapacitySodiumMass);
+                _resources.GetResourceMass(_atmosphere, out _spareRoomAtmosphereMass, out _maxCapacityAtmosphereMass);
+                _resources.GetResourceMass(_ammonia, out _spareRoomAmmoniaMass, out _maxCapacityAmmoniaMass);
+                _resources.GetResourceMass(_argon, out _spareRoomArgonMass, out _maxCapacityArgonMass);
+                _resources.GetResourceMass(_chlorine, out _spareRoomChlorineMass, out _maxCapacityChlorineMass);
+                _resources.GetResourceMass(_dioxide, out _spareRoomDioxideMass, out _maxCapacityDioxideMass);
+                _resources.GetResourceMass(_helium3, out _spareRoomHelium3Mass, out _maxCapacityHelium3Mass);
+                _resources.GetResourceMass(_helium4, out _spareRoomHelium4Mass, out _maxCapacityHelium4Mass);
+                _resources.GetResourceMass(_hydrogen, out _spareRoomHydrogenMass, out _maxCapacityHydrogenMass);
+                _resources.GetResourceMass(_methane, out _spareRoomMethaneMass, out _maxCapacityMethaneMass);
+                _resources.GetResourceMass(_monoxide, out _spareRoomMonoxideMass, out _maxCapacityMonoxideMass);
+                _resources.GetResourceMass(_neon, out _spareRoomNeonMass, out _maxCapacityNeonMass);
+                _resources.GetResourceMass(_nitrogen, out _spareRoomNitrogenMass, out _maxCapacityNitrogenMass);
+                _resources.GetResourceMass(_nitrogen15, out _spareRoomNitrogen15Mass, out _maxCapacityNitrogen15Mass);
+                _resources.GetResourceMass(_oxygen, out _spareRoomOxygenMass, out _maxCapacityOxygenMass);
+                _resources.GetResourceMass(_water, out _spareRoomWaterMass, out _maxCapacityWaterMass);
+                _resources.GetResourceMass(_heavyWater, out _spareRoomHeavyWaterMass, out _maxCapacityHeavyWaterMass);
+                _resources.GetResourceMass(_xenon, out _spareRoomXenonMass, out _maxCapacityXenonMass);
+                _resources.GetResourceMass(_deuterium, out _spareRoomDeuteriumMass, out _maxCapacityDeuteriumMass);
+                _resources.GetResourceMass(_krypton, out _spareRoomKryptonMass, out _maxCapacityKryptonMass);
+                _resources.GetResourceMass(_sodium, out _spareRoomSodiumMass, out _maxCapacitySodiumMass);
             }
             catch (Exception e)
             {
@@ -521,29 +521,29 @@ namespace FNPlugin.Refinery.Activity
                     var remainingConsumptionNeeded = Math.Max(0, buildInAirIntake - maxAtmosphericConsumptionRate);
 
                     // add the consumed atmosphere total atmospheric consumption rate
-                    _atmosphereConsumptionRate += _part.RequestResource(_atmosphereResourceName, remainingConsumptionNeeded / _atmosphere.density) / fixedDeltaTime * _atmosphere.density;
+                    _atmosphereConsumptionRate += _resources.RequestResource(_atmosphereResourceName, remainingConsumptionNeeded / _atmosphere.density) / fixedDeltaTime * _atmosphere.density;
                 }
 
                 // produce the resources
-                _ammoniaProductionRate = _ammoniaPercentage <= 0 ? 0 : -_part.RequestResource(_ammoniaResourceName, -_atmosphereConsumptionRate * _ammoniaPercentage * fixedDeltaTime / _atmosphere.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _atmosphere.density;
-                _argonProductionRate = _argonPercentage <= 0 ? 0 : -_part.RequestResource(_argonResourceName, -_atmosphereConsumptionRate * _argonPercentage * fixedDeltaTime / _argon.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _argon.density;
-                _chlorineProductionRate = _chlorinePercentage <= 0 ? 0 : -_part.RequestResource(_chlorineResourceName, -_atmosphereConsumptionRate * _chlorinePercentage * fixedDeltaTime / _chlorine.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _chlorine.density;
-                _dioxideProductionRate = _dioxidePercentage <= 0 ? 0 : -_part.RequestResource(_dioxideResourceName, -_atmosphereConsumptionRate * _dioxidePercentage * fixedDeltaTime / _dioxide.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _dioxide.density;
-                _helium3ProductionRate = _helium3Percentage <= 0 ? 0 : -_part.RequestResource(_helium3ResourceName, -_atmosphereConsumptionRate * _helium3Percentage * fixedDeltaTime / _helium3.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _helium3.density;
-                _helium4ProductionRate = _helium4Percentage <= 0 ? 0 : -_part.RequestResource(_helium4ResourceName, -_atmosphereConsumptionRate * _helium4Percentage * fixedDeltaTime / _helium4.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _helium4.density;
-                _hydrogenProductionRate = _hydrogenPercentage <= 0 ? 0 : -_part.RequestResource(_hydrogenResourceName, -_atmosphereConsumptionRate * _hydrogenPercentage * fixedDeltaTime / _hydrogen.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _hydrogen.density;
-                _methaneProductionRate = _methanePercentage <= 0 ? 0 : -_part.RequestResource(_methaneResourceName, -_atmosphereConsumptionRate * _methanePercentage * fixedDeltaTime / _methane.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _methane.density;
-                _monoxideProductionRate = _monoxidePercentage <= 0 ? 0 : -_part.RequestResource(_monoxideResourceName, -_atmosphereConsumptionRate * _monoxidePercentage * fixedDeltaTime / _monoxide.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _monoxide.density;
-                _neonProductionRate = _neonPercentage <= 0 ? 0 : -_part.RequestResource(_neonResourceName, -_atmosphereConsumptionRate * _neonPercentage * fixedDeltaTime / _neon.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _neon.density;
-                _nitrogenProductionRate = _nitrogenPercentage <= 0 ? 0 : -_part.RequestResource(_nitrogenResourceName, -_atmosphereConsumptionRate * _nitrogenPercentage * fixedDeltaTime / _nitrogen.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _nitrogen.density;
-                _nitrogen15ProductionRate = _nitrogen15Percentage <= 0 ? 0 : -_part.RequestResource(_nitrogen15ResourceName, -_atmosphereConsumptionRate * _nitrogen15Percentage * fixedDeltaTime / _nitrogen15.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _nitrogen15.density;
-                _oxygenProductionRate = _oxygenPercentage <= 0 ? 0 : -_part.RequestResource(_oxygenResourceName, -_atmosphereConsumptionRate * _oxygenPercentage * fixedDeltaTime / _oxygen.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _oxygen.density;
-                _waterProductionRate = _waterPercentage <= 0 ? 0 : -_part.RequestResource(_waterResourceName, -_atmosphereConsumptionRate * _waterPercentage * fixedDeltaTime / _water.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _water.density;
-                _heavyWaterProductionRate = _heavywaterPercentage <= 0 ? 0 : -_part.RequestResource(_heavyWaterResourceName, -_atmosphereConsumptionRate * _heavywaterPercentage * fixedDeltaTime / _heavyWater.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _heavyWater.density;
-                _xenonProductionRate = _xenonPercentage <= 0 ? 0 : -_part.RequestResource(_xenonResourceName, -_atmosphereConsumptionRate * _xenonPercentage * fixedDeltaTime / _xenon.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _xenon.density;
-                _deuteriumProductionRate = _deuteriumPercentage <= 0 ? 0 : -_part.RequestResource(_deuteriumResourceName, -_atmosphereConsumptionRate * _deuteriumPercentage * fixedDeltaTime / _deuterium.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _deuterium.density;
-                _kryptonProductionRate = _kryptonPercentage <= 0 ? 0 : -_part.RequestResource(_kryptonResourceName, -_atmosphereConsumptionRate * _kryptonPercentage * fixedDeltaTime / _krypton.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _krypton.density;
-                _sodiumProductionRate = _sodiumPercentage <= 0 ? 0 : -_part.RequestResource(_sodiumResourceName, -_atmosphereConsumptionRate * _sodiumPercentage * fixedDeltaTime / _sodium.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _sodium.density;
+                _ammoniaProductionRate = _ammoniaPercentage <= 0 ? 0 : -_resources.RequestResource(_ammoniaResourceName, -_atmosphereConsumptionRate * _ammoniaPercentage * fixedDeltaTime / _atmosphere.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _atmosphere.density;
+                _argonProductionRate = _argonPercentage <= 0 ? 0 : -_resources.RequestResource(_argonResourceName, -_atmosphereConsumptionRate * _argonPercentage * fixedDeltaTime / _argon.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _argon.density;
+                _chlorineProductionRate = _chlorinePercentage <= 0 ? 0 : -_resources.RequestResource(_chlorineResourceName, -_atmosphereConsumptionRate * _chlorinePercentage * fixedDeltaTime / _chlorine.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _chlorine.density;
+                _dioxideProductionRate = _dioxidePercentage <= 0 ? 0 : -_resources.RequestResource(_dioxideResourceName, -_atmosphereConsumptionRate * _dioxidePercentage * fixedDeltaTime / _dioxide.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _dioxide.density;
+                _helium3ProductionRate = _helium3Percentage <= 0 ? 0 : -_resources.RequestResource(_helium3ResourceName, -_atmosphereConsumptionRate * _helium3Percentage * fixedDeltaTime / _helium3.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _helium3.density;
+                _helium4ProductionRate = _helium4Percentage <= 0 ? 0 : -_resources.RequestResource(_helium4ResourceName, -_atmosphereConsumptionRate * _helium4Percentage * fixedDeltaTime / _helium4.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _helium4.density;
+                _hydrogenProductionRate = _hydrogenPercentage <= 0 ? 0 : -_resources.RequestResource(_hydrogenResourceName, -_atmosphereConsumptionRate * _hydrogenPercentage * fixedDeltaTime / _hydrogen.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _hydrogen.density;
+                _methaneProductionRate = _methanePercentage <= 0 ? 0 : -_resources.RequestResource(_methaneResourceName, -_atmosphereConsumptionRate * _methanePercentage * fixedDeltaTime / _methane.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _methane.density;
+                _monoxideProductionRate = _monoxidePercentage <= 0 ? 0 : -_resources.RequestResource(_monoxideResourceName, -_atmosphereConsumptionRate * _monoxidePercentage * fixedDeltaTime / _monoxide.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _monoxide.density;
+                _neonProductionRate = _neonPercentage <= 0 ? 0 : -_resources.RequestResource(_neonResourceName, -_atmosphereConsumptionRate * _neonPercentage * fixedDeltaTime / _neon.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _neon.density;
+                _nitrogenProductionRate = _nitrogenPercentage <= 0 ? 0 : -_resources.RequestResource(_nitrogenResourceName, -_atmosphereConsumptionRate * _nitrogenPercentage * fixedDeltaTime / _nitrogen.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _nitrogen.density;
+                _nitrogen15ProductionRate = _nitrogen15Percentage <= 0 ? 0 : -_resources.RequestResource(_nitrogen15ResourceName, -_atmosphereConsumptionRate * _nitrogen15Percentage * fixedDeltaTime / _nitrogen15.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _nitrogen15.density;
+                _oxygenProductionRate = _oxygenPercentage <= 0 ? 0 : -_resources.RequestResource(_oxygenResourceName, -_atmosphereConsumptionRate * _oxygenPercentage * fixedDeltaTime / _oxygen.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _oxygen.density;
+                _waterProductionRate = _waterPercentage <= 0 ? 0 : -_resources.RequestResource(_waterResourceName, -_atmosphereConsumptionRate * _waterPercentage * fixedDeltaTime / _water.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _water.density;
+                _heavyWaterProductionRate = _heavywaterPercentage <= 0 ? 0 : -_resources.RequestResource(_heavyWaterResourceName, -_atmosphereConsumptionRate * _heavywaterPercentage * fixedDeltaTime / _heavyWater.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _heavyWater.density;
+                _xenonProductionRate = _xenonPercentage <= 0 ? 0 : -_resources.RequestResource(_xenonResourceName, -_atmosphereConsumptionRate * _xenonPercentage * fixedDeltaTime / _xenon.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _xenon.density;
+                _deuteriumProductionRate = _deuteriumPercentage <= 0 ? 0 : -_resources.RequestResource(_deuteriumResourceName, -_atmosphereConsumptionRate * _deuteriumPercentage * fixedDeltaTime / _deuterium.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _deuterium.density;
+                _kryptonProductionRate = _kryptonPercentage <= 0 ? 0 : -_resources.RequestResource(_kryptonResourceName, -_atmosphereConsumptionRate * _kryptonPercentage * fixedDeltaTime / _krypton.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _krypton.density;
+                _sodiumProductionRate = _sodiumPercentage <= 0 ? 0 : -_resources.RequestResource(_sodiumResourceName, -_atmosphereConsumptionRate * _sodiumPercentage * fixedDeltaTime / _sodium.density, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _sodium.density;
             }
             else
             {

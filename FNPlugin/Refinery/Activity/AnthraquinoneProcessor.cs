@@ -52,8 +52,8 @@ namespace FNPlugin.Refinery.Activity
             if (_hydrogenResourceName == null || _oxygenResourceName == null || _hydrogenPeroxideResourceName == null)
                 return false;
 
-            return _part.GetConnectedResources(_hydrogenResourceName).Any(rs => rs.amount > 0) &
-                _part.GetConnectedResources(_oxygenResourceName).Any(rs => rs.amount > 0);
+            return _resources.GetConnectedResources(_hydrogenResourceName).Any(rs => rs.amount > 0) &
+                _resources.GetConnectedResources(_oxygenResourceName).Any(rs => rs.amount > 0);
         }
 
         public override void Initialize(Part localPart, InterstellarRefineryController controller)
@@ -77,9 +77,9 @@ namespace FNPlugin.Refinery.Activity
             _current_power = _effectiveMaxPower * powerFraction;
             _current_rate = CurrentPower / PluginSettings.Config.AnthraquinoneEnergyPerTon;
 
-            var partsThatContainOxygen = _part.GetConnectedResources(_oxygenResourceName).ToList();
-            var partsThatContainHydrogen = _part.GetConnectedResources(_hydrogenResourceName).ToList();
-            var partsThatContainPeroxide = _part.GetConnectedResources(_hydrogenPeroxideResourceName).ToList();
+            var partsThatContainOxygen = _resources.GetConnectedResources(_oxygenResourceName).ToList();
+            var partsThatContainHydrogen = _resources.GetConnectedResources(_hydrogenResourceName).ToList();
+            var partsThatContainPeroxide = _resources.GetConnectedResources(_hydrogenPeroxideResourceName).ToList();
 
             _maxCapacityOxygenMass = partsThatContainOxygen.Sum(p => p.maxAmount) * _oxygenDensity;
             _maxCapacityHydrogenMass = partsThatContainHydrogen.Sum(p => p.maxAmount) * _hydrogenDensity;
@@ -107,12 +107,12 @@ namespace FNPlugin.Refinery.Activity
                 var oxygenConsumptionRate = fixedMaxPossibleHydrogenPeroxideRate * OxygenMassByFraction;
 
                 // consume the resource
-                _hydrogenConsumptionRate = _part.RequestResource(_hydrogenResourceName, hydrogenConsumptionRate / _hydrogenDensity) / fixedDeltaTime * _hydrogenDensity;
-                _oxygenConsumptionRate = _part.RequestResource(_oxygenResourceName, oxygenConsumptionRate / _oxygenDensity) / fixedDeltaTime * _oxygenDensity;
+                _hydrogenConsumptionRate = _resources.RequestResource(_hydrogenResourceName, hydrogenConsumptionRate / _hydrogenDensity) / fixedDeltaTime * _hydrogenDensity;
+                _oxygenConsumptionRate = _resources.RequestResource(_oxygenResourceName, oxygenConsumptionRate / _oxygenDensity) / fixedDeltaTime * _oxygenDensity;
 
                 var combinedConsumptionRate = (_hydrogenConsumptionRate + _oxygenConsumptionRate) * fixedDeltaTime / _hydrogenPeroxideDensity;
 
-                _hydrogenPeroxideProductionRate = -_part.RequestResource(_hydrogenPeroxideResourceName, -combinedConsumptionRate) / fixedDeltaTime * _hydrogenPeroxideDensity;
+                _hydrogenPeroxideProductionRate = -_resources.RequestResource(_hydrogenPeroxideResourceName, -combinedConsumptionRate) / fixedDeltaTime * _hydrogenPeroxideDensity;
             }
             else
             {
@@ -182,9 +182,9 @@ namespace FNPlugin.Refinery.Activity
 
         public override void PrintMissingResources()
         {
-            if (!_part.GetConnectedResources(_hydrogenResourceName).Any(rs => rs.amount > 0))
+            if (!_resources.GetConnectedResources(_hydrogenResourceName).Any(rs => rs.amount > 0))
                 ScreenMessages.PostScreenMessage(Localizer.Format("#LOC_KSPIE_AnthraquinoneProcessor_Postmsg") + " " + _hydrogenResourceName, 3.0f, ScreenMessageStyle.UPPER_CENTER);//Missing
-            if (!_part.GetConnectedResources(_oxygenResourceName).Any(rs => rs.amount > 0))
+            if (!_resources.GetConnectedResources(_oxygenResourceName).Any(rs => rs.amount > 0))
                 ScreenMessages.PostScreenMessage(Localizer.Format("#LOC_KSPIE_AnthraquinoneProcessor_Postmsg") + " " + _oxygenResourceName, 3.0f, ScreenMessageStyle.UPPER_CENTER);//Missing
         }
     }

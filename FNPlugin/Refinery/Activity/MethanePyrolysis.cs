@@ -59,7 +59,7 @@ namespace FNPlugin.Refinery.Activity
             if (_carbonResourceName == null || _hydrogenResourceName == null || _methaneResourceName == null)
                 return false;
 
-            return _part.GetConnectedResources(_methaneResourceName).Any(rs => rs.amount > 0);
+            return _resources.GetConnectedResources(_methaneResourceName).Any(rs => rs.amount > 0);
         }
 
         public override void Initialize(Part localPart, InterstellarRefineryController controller)
@@ -96,9 +96,9 @@ namespace FNPlugin.Refinery.Activity
 
             // only unlocked tanks: RequestResource below skips locked ones, so free room counted in a locked tank would
             // let methane be consumed with the product lost
-            var partsThatContainCarbon = _part.GetConnectedResources(_carbonResourceName).Where(r => r.flowState).ToList();
-            var partsThatContainHydrogen = _part.GetConnectedResources(_hydrogenResourceName).Where(r => r.flowState).ToList();
-            var partsThatContainMethane = _part.GetConnectedResources(_methaneResourceName).Where(r => r.flowState).ToList();
+            var partsThatContainCarbon = _resources.GetConnectedResources(_carbonResourceName).Where(r => r.flowState).ToList();
+            var partsThatContainHydrogen = _resources.GetConnectedResources(_hydrogenResourceName).Where(r => r.flowState).ToList();
+            var partsThatContainMethane = _resources.GetConnectedResources(_methaneResourceName).Where(r => r.flowState).ToList();
 
             _maxCapacityCarbonMass = partsThatContainCarbon.Sum(p => p.maxAmount) * _carbonDensity;
             _maxCapacityHydrogenMass = partsThatContainHydrogen.Sum(p => p.maxAmount) * _hydrogenDensity;
@@ -122,11 +122,11 @@ namespace FNPlugin.Refinery.Activity
 
                 var storageRatio = Math.Min(fixedPossibleCarbonMass / fixedMaxCarbonMass, fixedPossibleHydrogenMass / fixedMaxHydrogenMass);
 
-                var consumedMethaneMass = _part.RequestResource(_methaneResourceName, storageRatio * fixedMethaneMass / _methaneDensity, ResourceFlowMode.ALL_VESSEL) * _methaneDensity;
+                var consumedMethaneMass = _resources.RequestResource(_methaneResourceName, storageRatio * fixedMethaneMass / _methaneDensity, ResourceFlowMode.ALL_VESSEL) * _methaneDensity;
                 _methaneConsumptionRate = consumedMethaneMass / fixedDeltaTime;
 
-                _carbonProductionRate = -_part.RequestResource(_carbonResourceName, -consumedMethaneMass * CarbonMassByFraction / _carbonDensity) / fixedDeltaTime * _carbonDensity;
-                _hydrogenProductionRate = -_part.RequestResource(_hydrogenResourceName, -consumedMethaneMass * HydrogenMassByFraction / _hydrogenDensity) / fixedDeltaTime * _hydrogenDensity;
+                _carbonProductionRate = -_resources.RequestResource(_carbonResourceName, -consumedMethaneMass * CarbonMassByFraction / _carbonDensity) / fixedDeltaTime * _carbonDensity;
+                _hydrogenProductionRate = -_resources.RequestResource(_hydrogenResourceName, -consumedMethaneMass * HydrogenMassByFraction / _hydrogenDensity) / fixedDeltaTime * _hydrogenDensity;
             }
             else
             {
@@ -189,7 +189,7 @@ namespace FNPlugin.Refinery.Activity
 
         public override void PrintMissingResources()
         {
-            if (!_part.GetConnectedResources(_methaneResourceName).Any(rs => rs.amount > 0))
+            if (!_resources.GetConnectedResources(_methaneResourceName).Any(rs => rs.amount > 0))
                 ScreenMessages.PostScreenMessage(Localizer.Format("#LOC_KSPIE_MethanePyrolysis_PostMsg") +" " + _methaneResourceName, 3.0f, ScreenMessageStyle.UPPER_CENTER);//Missing
         }
     }

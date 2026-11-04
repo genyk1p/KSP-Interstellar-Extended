@@ -46,21 +46,21 @@ namespace FNPlugin.Refinery.Activity
             if (_definitionHydrogen == null || _definitionAmmonia == null || _definitionNitrogen == null)
                 return false;
 
-            _availableHydrogen = _part.GetResourceAvailable(_definitionHydrogen, ResourceFlowMode.ALL_VESSEL);
+            _availableHydrogen = _resources.GetResourceAvailable(_definitionHydrogen, ResourceFlowMode.ALL_VESSEL);
 
             return _availableHydrogen > 0;
         }
 
         private bool HasAccessToNitrogen()
         {
-            _availableNitrogen = _part.GetResourceAvailable(_definitionNitrogen, ResourceFlowMode.ALL_VESSEL);
+            _availableNitrogen = _resources.GetResourceAvailable(_definitionNitrogen, ResourceFlowMode.ALL_VESSEL);
 
             return _availableNitrogen > 0;
         }
 
         private bool HasSpareCapacityAmmonia()
         {
-            _spareCapacityAmmonia = _part.GetResourceSpareCapacity(_definitionAmmonia, ResourceFlowMode.ALL_VESSEL);
+            _spareCapacityAmmonia = _resources.GetResourceSpareCapacity(_definitionAmmonia, ResourceFlowMode.ALL_VESSEL);
 
             return _spareCapacityAmmonia > 0;
         }
@@ -101,8 +101,8 @@ namespace FNPlugin.Refinery.Activity
 
             var adjustedRateRatio = Math.Min(productionRatioAmmonia, Math.Min(supplyRatioHydrogen, supplyRatioNitrogen));
 
-            _hydrogenConsumptionRate = _part.RequestResource(_definitionHydrogen.id, adjustedRateRatio * requiredHydrogen, ResourceFlowMode.ALL_VESSEL) * _hydrogenDensity / fixedDeltaTime;
-            _nitrogenConsumptionRate = _part.RequestResource(_definitionNitrogen.id, adjustedRateRatio * requiredNitrogen, ResourceFlowMode.ALL_VESSEL) * _nitrogenDensity / fixedDeltaTime;
+            _hydrogenConsumptionRate = _resources.RequestResource(_definitionHydrogen.id, adjustedRateRatio * requiredHydrogen, ResourceFlowMode.ALL_VESSEL) * _hydrogenDensity / fixedDeltaTime;
+            _nitrogenConsumptionRate = _resources.RequestResource(_definitionNitrogen.id, adjustedRateRatio * requiredNitrogen, ResourceFlowMode.ALL_VESSEL) * _nitrogenDensity / fixedDeltaTime;
 
             var consumedRatioHydrogen = hydrogenRate > 0 ? _hydrogenConsumptionRate / hydrogenRate : 0;
             var consumedRatioNitrogen = nitrogenRate > 0 ? _nitrogenConsumptionRate / nitrogenRate : 0;
@@ -112,7 +112,7 @@ namespace FNPlugin.Refinery.Activity
             if (consumedRatio > 0)
             {
                 var ammoniaProduction = -consumedRatio * maxProductionAmmonia;
-                var ammoniaProduced = -_part.RequestResource(_definitionAmmonia.id, ammoniaProduction, ResourceFlowMode.ALL_VESSEL);
+                var ammoniaProduced = -_resources.RequestResource(_definitionAmmonia.id, ammoniaProduction, ResourceFlowMode.ALL_VESSEL);
                 _ammoniaProductionRate = ammoniaProduced * _ammoniaDensity / fixedDeltaTime;
 
                 if (isStartup)

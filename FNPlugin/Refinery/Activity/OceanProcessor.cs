@@ -58,7 +58,7 @@ namespace FNPlugin.Refinery.Activity
         // this is a function used for IRefinery HasActivityRequirements check
         public bool IsThereAnyLiquid()
         {
-            return GetTotalLiquidScoopedPerSecond() > 0 || _part.GetResourceAvailable(_intakeLiquidDefinition) > 0;
+            return GetTotalLiquidScoopedPerSecond() > 0 || _resources.GetResourceAvailable(_intakeLiquidDefinition) > 0;
         }
 
         /* This is just a short cycle that goes through the air intakes on the vessel, looks at which ones are submerged and multiplies the percentage of the part's submersion
@@ -105,7 +105,7 @@ namespace FNPlugin.Refinery.Activity
             // supplement any missing LiquidIntake by intake
             var shortage = fixedMaxLiquidConsumptionRate > _availableIntakeLiquidMass ? fixedMaxLiquidConsumptionRate - _availableIntakeLiquidMass : 0;
             if (shortage > 0)
-                _availableIntakeLiquidMass += _part.RequestResource(_intakeLiquidDefinition.id, shortage, ResourceFlowMode.ALL_VESSEL);
+                _availableIntakeLiquidMass += _resources.RequestResource(_intakeLiquidDefinition.id, shortage, ResourceFlowMode.ALL_VESSEL);
 
             var liquidConsumptionRatio = offlineCollecting ? 1
                     : fixedMaxLiquidConsumptionRate > 0
@@ -131,7 +131,7 @@ namespace FNPlugin.Refinery.Activity
                     continue; // this resource is missing a resource definition
 
                 // determine the spare room - gets parts that contain the current resource, gets the sum of their maxAmount - (current)amount and multiplies by density of resource
-                var currentResourceSpareRoom = _part.GetConnectedResources(resource.ResourceName).Sum(r => r.maxAmount - r.amount) * resource.Definition.density;
+                var currentResourceSpareRoom = _resources.GetConnectedResources(resource.ResourceName).Sum(r => r.maxAmount - r.amount) * resource.Definition.density;
 
                 // how much we should add per cycle
                 var currentResourceMaxRate = fixedConsumptionRate * resource.ResourceAbundance;
@@ -155,7 +155,7 @@ namespace FNPlugin.Refinery.Activity
                 var currentResourceTempProductionRate = _intakeLqdConsumptionRate * resource.ResourceAbundance;
 
                 // add the produced resource
-                 var currentProductionRate = -_part.RequestResource(resource.ResourceName, -currentResourceTempProductionRate * timeDifference / resource.Definition.density, ResourceFlowMode.ALL_VESSEL) / timeDifference * resource.Definition.density;
+                 var currentProductionRate = -_resources.RequestResource(resource.ResourceName, -currentResourceTempProductionRate * timeDifference / resource.Definition.density, ResourceFlowMode.ALL_VESSEL) / timeDifference * resource.Definition.density;
 
                 _productionRateDict.Add(resource.ResourceName, currentProductionRate);
 
@@ -210,7 +210,7 @@ namespace FNPlugin.Refinery.Activity
                     continue;
                 }
 
-                var connectedResources = _part.GetConnectedResources(resource.ResourceName).ToList();
+                var connectedResources = _resources.GetConnectedResources(resource.ResourceName).ToList();
                 var spareRoom = connectedResources.Sum(r => r.maxAmount - r.amount) * resource.Definition.density;
                 var maximumCapacity = connectedResources.Sum(r => r.maxAmount) * resource.Definition.density;
                 var productionRate = _productionRateDict[resource.ResourceName];

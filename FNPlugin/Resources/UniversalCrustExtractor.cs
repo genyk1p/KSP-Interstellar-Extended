@@ -234,11 +234,63 @@ namespace FNPlugin.Resources
 
                 if (bIsEnabled && CheckForPreviousData())
                 {
-                    double timeDifference = (Planetarium.GetUniversalTime() - dLastActiveTime) * 55;
+                    // fork: upstream multiplied the time by 55 (55 times the loaded rate while away)
+                    double timeDifference = Planetarium.GetUniversalTime() - dLastActiveTime;
                     MineResources(true, timeDifference);
                 }
             }
 
+        }
+
+        // background (Background/BackgroundConsumers, todo/kspie-rails-warp.md A2): values kept from load until the
+        // drill has run in this flight
+        private ConfigNode _loadedBackgroundValues;
+        private bool _backgroundReady;
+        private bool _backgroundErrorLogged;
+
+        public override void OnLoad(ConfigNode node)
+        {
+            base.OnLoad(node);
+            _loadedBackgroundValues = Background.BackgroundSnapshot.CopyBackgroundValues(node);
+        }
+
+        public override void OnSave(ConfigNode node)
+        {
+            base.OnSave(node);
+            if (HighLogic.LoadedSceneIsFlight)
+                Background.BackgroundSnapshot.Save(this, node, _backgroundReady, _loadedBackgroundValues, SaveBackgroundValues, ref _backgroundErrorLogged);
+        }
+
+        /// <summary>
+        /// What the drill mines per second at full power where it stands (MineResources, loaded branch): the
+        /// background step scales it by the power the vessel gives the drill. Not active when the drill could not
+        /// mine here now (CheckIfCollectingPossible: landed, extended, terrain in reach).
+        /// </summary>
+        private void SaveBackgroundValues(ConfigNode node)
+        {
+            var outputs = new List<KeyValuePair<string, double>>();
+            var active = bIsEnabled && string.IsNullOrEmpty(CheckIfCollectingPossible()) && GetResourceData()
+                && CalculateCrustThickness(vessel.altitude, vessel.mainBody, out var crustThickness)
+                && FillBackgroundOutputs(outputs, crustThickness);
+            var demand = PluginSettings.Config.PowerConsumptionMultiplier * mwRequirements;
+            // HasEnoughPower: ElectricCharge for the shortage only under 5 MW
+            Background.BackgroundConsumers.WriteRecipe(node, active, demand, getPowerPriority(), 0, minimumPowerNeeded, demand < 5.0,
+                null, outputs, nameof(dLastActiveTime));
+        }
+
+        private bool FillBackgroundOutputs(List<KeyValuePair<string, double>> outputs, double crustThickness)
+        {
+            foreach (var resource in localResources)
+            {
+                if (!CrustalResourceAbundanceDict.TryGetValue(resource.ResourceName, out var abundance) || abundance == null)
+                    continue;
+                var perSecond = resource.ResourceName == "Ore"
+                    ? 0.0005 * drillSize * effectiveness * abundance.Local
+                    : crustThickness * drillSize * effectiveness * abundance.Local;
+                if (perSecond > 0 && !double.IsInfinity(perSecond))
+                    outputs.Add(new KeyValuePair<string, double>(resource.ResourceName, perSecond));
+            }
+            return outputs.Count > 0;
         }
 
         public override void OnUpdate()
@@ -312,6 +364,7 @@ namespace FNPlugin.Resources
         //public override void OnFixedUpdate()
         public override void OnFixedUpdateResourceSuppliable(double fixedDeltaTime)
         {
+            _backgroundReady = true;
             if (bIsEnabled)
             {
                 ToggleEmmitters(true);

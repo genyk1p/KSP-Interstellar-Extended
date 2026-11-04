@@ -27,7 +27,7 @@ namespace FNPlugin.Refinery.Activity
 
         public override bool HasActivityRequirements()
         {
-            return _part.GetConnectedResources(ResourceSettings.Config.Actinides).Any(rs => rs.amount < rs.maxAmount);
+            return _resources.GetConnectedResources(ResourceSettings.Config.Actinides).Any(rs => rs.amount < rs.maxAmount);
         }
 
         public override void UpdateFrame(double rateMultiplier, double powerFraction, double productionModifier, bool allowOverflow, double fixedDeltaTime, bool isStartup = false)

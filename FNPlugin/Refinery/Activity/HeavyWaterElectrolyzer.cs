@@ -53,7 +53,7 @@ namespace FNPlugin.Refinery.Activity
             if (_waterHeavyResourceName == null || _oxygenResourceName == null || _deuteriumResourceName == null)
                 return false;
 
-            return _part.GetConnectedResources(ResourceSettings.Config.WaterHeavy).Any(rs => rs.amount > 0);
+            return _resources.GetConnectedResources(ResourceSettings.Config.WaterHeavy).Any(rs => rs.amount > 0);
         }
 
         public override void Initialize(Part localPart, InterstellarRefineryController controller)
@@ -64,7 +64,6 @@ namespace FNPlugin.Refinery.Activity
             _oxygenResourceName = ResourceSettings.Config.OxygenGas;
             _deuteriumResourceName = ResourceSettings.Config.DeuteriumGas;
 
-            _vessel = localPart.vessel;
             _heavyWaterDensity = PartResourceLibrary.Instance.GetDefinition(_waterHeavyResourceName).density;
             _oxygenDensity = PartResourceLibrary.Instance.GetDefinition(_oxygenResourceName).density;
             _deuteriumDensity = PartResourceLibrary.Instance.GetDefinition(_deuteriumResourceName).density;
@@ -76,9 +75,9 @@ namespace FNPlugin.Refinery.Activity
             _current_power = PowerRequirements * rateMultiplier;
             _current_rate = CurrentPower / EnergyPerTon;
 
-            var partsThatContainWater = _part.GetConnectedResources(_waterHeavyResourceName).ToList();
-            var partsThatContainOxygen = _part.GetConnectedResources(_oxygenResourceName).ToList();
-            var partsThatContainDeuterium = _part.GetConnectedResources(_deuteriumResourceName).ToList();
+            var partsThatContainWater = _resources.GetConnectedResources(_waterHeavyResourceName).ToList();
+            var partsThatContainOxygen = _resources.GetConnectedResources(_oxygenResourceName).ToList();
+            var partsThatContainDeuterium = _resources.GetConnectedResources(_deuteriumResourceName).ToList();
 
             _maxCapacityHeavyWaterMass = partsThatContainWater.Sum(p => p.maxAmount) * _heavyWaterDensity;
             _maxCapacityOxygenMass = partsThatContainOxygen.Sum(p => p.maxAmount) * _oxygenDensity;
@@ -105,13 +104,13 @@ namespace FNPlugin.Refinery.Activity
                 _consumptionStorageRatio = Math.Min(fixedMaxPossibleHydrogenRatio, fixedMaxPossibleOxygenRatio);
 
                 // now we do the real electrolysis
-                _heavyWaterConsumptionRate = _part.RequestResource(_waterHeavyResourceName, _consumptionStorageRatio * _fixedMaxConsumptionWaterRate / _heavyWaterDensity) / fixedDeltaTime * _heavyWaterDensity;
+                _heavyWaterConsumptionRate = _resources.RequestResource(_waterHeavyResourceName, _consumptionStorageRatio * _fixedMaxConsumptionWaterRate / _heavyWaterDensity) / fixedDeltaTime * _heavyWaterDensity;
 
                 var deuteriumRateTemp = _heavyWaterConsumptionRate * DeuteriumMassByFraction;
                 var oxygenRateTemp = _heavyWaterConsumptionRate * OxygenMassByFraction;
 
-                _deuteriumProductionRate = -_part.RequestResource(_deuteriumResourceName, -deuteriumRateTemp * fixedDeltaTime / _deuteriumDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _deuteriumDensity;
-                _oxygenProductionRate = -_part.RequestResource(_oxygenResourceName, -oxygenRateTemp * fixedDeltaTime / _oxygenDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _oxygenDensity;
+                _deuteriumProductionRate = -_resources.RequestResource(_deuteriumResourceName, -deuteriumRateTemp * fixedDeltaTime / _deuteriumDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _deuteriumDensity;
+                _oxygenProductionRate = -_resources.RequestResource(_oxygenResourceName, -oxygenRateTemp * fixedDeltaTime / _oxygenDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _oxygenDensity;
             }
             else
             {

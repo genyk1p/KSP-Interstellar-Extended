@@ -57,9 +57,50 @@ namespace FNPlugin.Refinery
         private int _windowId;
         private bool _overflowAllowed;
 
+        // background (Background/BackgroundConsumers, todo/kspie-rails-warp.md A2): values kept from load until the
+        // refinery has run in this flight
+        private ConfigNode _loadedBackgroundValues;
+        private bool _backgroundReady;
+        private bool _backgroundErrorLogged;
+
+        public override void OnSave(ConfigNode node)
+        {
+            base.OnSave(node);
+            if (HighLogic.LoadedSceneIsFlight)
+                Background.BackgroundSnapshot.Save(this, node, _backgroundReady, _loadedBackgroundValues, SaveBackgroundValues, ref _backgroundErrorLogged);
+        }
+
+        /// <summary>
+        /// What the background step needs besides the persistent fields (refinery_is_enabled, lastClassName,
+        /// powerPercentage, lastOverflowSettings): the multipliers as TweakScale left them, and the power priority.
+        /// </summary>
+        private void SaveBackgroundValues(ConfigNode node)
+        {
+            node.SetValue(Background.BackgroundConsumers.ConsumerMarker, Background.BackgroundConsumers.RefineryKind, true);
+            node.SetValue(Background.BackgroundSnapshot.Active, refinery_is_enabled.ToString(), true);
+            node.SetValue(Background.BackgroundConsumers.PowerScale, Background.BackgroundSnapshot.Number(powerReqMult * baseProduction), true);
+            node.SetValue(Background.BackgroundConsumers.ProductionModifier, Background.BackgroundSnapshot.Number(productionMult * baseProduction), true);
+            node.SetValue(Background.BackgroundConsumers.Priority, (powerSupply?.PowerPriority ?? 4).ToString(System.Globalization.CultureInfo.InvariantCulture), true);
+
+            // resources of the vessel this part cannot reach through crossfeed: the activities' crossfeed-bound
+            // requests (LqdWater: STACK_PRIORITY_SEARCH) get nothing of them here, so neither in the background
+            var unreachable = new List<string>();
+            var seen = new HashSet<int>();
+            foreach (var vesselPart in vessel.parts)
+                foreach (var resource in vesselPart.Resources)
+                {
+                    if (resource.info == null || !seen.Add(resource.info.id)) continue;
+                    part.GetConnectedResourceTotals(resource.info.id, ResourceFlowMode.STACK_PRIORITY_SEARCH, out _, out var reachable);
+                    if (reachable <= 0)
+                        unreachable.Add(resource.resourceName);
+                }
+            node.SetValue(Background.BackgroundConsumers.Unreachable, string.Join(";", unreachable), true);
+        }
+
         public override void OnLoad(ConfigNode node)
         {
             base.OnLoad(node);
+            _loadedBackgroundValues = Background.BackgroundSnapshot.CopyBackgroundValues(node);
 
             var interstellarPowerSupply = part.FindModuleImplementing<InterstellarPowerSupply>();
             if (interstellarPowerSupply != null)
@@ -202,6 +243,9 @@ namespace FNPlugin.Refinery
         public void FixedUpdate()
         {
             currentPowerReq = 0;
+
+            if (HighLogic.LoadedSceneIsFlight)
+                _backgroundReady = true;
 
             if (!HighLogic.LoadedSceneIsFlight || !refinery_is_enabled || currentActivity == null)
             {

@@ -62,8 +62,8 @@ namespace FNPlugin.Refinery.Activity
             if (_carbonDioxideResourceName == null || _hydrogenResourceName == null || _methaneResourceName == null || _oxygenResourceName == null)
                 return false;
 
-            return _part.GetConnectedResources(_hydrogenResourceName).Any(rs => rs.amount > 0) &
-                _part.GetConnectedResources(_carbonDioxideResourceName).Any(rs => rs.amount > 0);
+            return _resources.GetConnectedResources(_hydrogenResourceName).Any(rs => rs.amount > 0) &
+                _resources.GetConnectedResources(_carbonDioxideResourceName).Any(rs => rs.amount > 0);
         }
 
         public override void Initialize(Part localPart, InterstellarRefineryController controller)
@@ -87,10 +87,10 @@ namespace FNPlugin.Refinery.Activity
             _current_rate = CurrentPower / EnergyPerTon;
 
             // determine how much resource we have
-            var partsThatContainCarbonDioxide = _part.GetConnectedResources(_carbonDioxideResourceName).ToList();
-            var partsThatContainHydrogen = _part.GetConnectedResources(_hydrogenResourceName).ToList();
-            var partsThatContainMethane = _part.GetConnectedResources(_methaneResourceName).ToList();
-            var partsThatContainOxygen = _part.GetConnectedResources(_oxygenResourceName).ToList();
+            var partsThatContainCarbonDioxide = _resources.GetConnectedResources(_carbonDioxideResourceName).ToList();
+            var partsThatContainHydrogen = _resources.GetConnectedResources(_hydrogenResourceName).ToList();
+            var partsThatContainMethane = _resources.GetConnectedResources(_methaneResourceName).ToList();
+            var partsThatContainOxygen = _resources.GetConnectedResources(_oxygenResourceName).ToList();
 
             _maxCapacityCarbonDioxideMass = partsThatContainCarbonDioxide.Sum(p => p.maxAmount) * _carbonDioxideDensity;
             _maxCapacityHydrogenMass = partsThatContainHydrogen.Sum(p => p.maxAmount) * _hydrogenDensity;
@@ -120,8 +120,8 @@ namespace FNPlugin.Refinery.Activity
                 var hydrogenConsumptionRate = fixedMaxPossibleProductionRate * HydrogenMassByFraction;
 
                 // consume the resource
-                _hydrogenConsumptionRate = _part.RequestResource(_hydrogenResourceName, hydrogenConsumptionRate / _hydrogenDensity) / fixedDeltaTime * _hydrogenDensity;
-                _carbonDioxideConsumptionRate = _part.RequestResource(_carbonDioxideResourceName, carbonDioxideConsumptionRate / _carbonDioxideDensity) / fixedDeltaTime * _carbonDioxideDensity;
+                _hydrogenConsumptionRate = _resources.RequestResource(_hydrogenResourceName, hydrogenConsumptionRate / _hydrogenDensity) / fixedDeltaTime * _hydrogenDensity;
+                _carbonDioxideConsumptionRate = _resources.RequestResource(_carbonDioxideResourceName, carbonDioxideConsumptionRate / _carbonDioxideDensity) / fixedDeltaTime * _carbonDioxideDensity;
 
                 _fixedCombinedConsumptionRate = _hydrogenConsumptionRate + _carbonDioxideConsumptionRate;
                 _combinedConsumptionRate = _fixedCombinedConsumptionRate / fixedDeltaTime;
@@ -129,8 +129,8 @@ namespace FNPlugin.Refinery.Activity
                 var fixedMethaneProduction = _fixedCombinedConsumptionRate * MethaneMassByFraction * fixedDeltaTime / _methaneDensity;
                 var fixedOxygenProduction = _fixedCombinedConsumptionRate * OxygenMassByFraction * fixedDeltaTime / _oxygenDensity;
 
-                _methaneProductionRate = -_part.RequestResource(_methaneResourceName, -fixedMethaneProduction) / fixedDeltaTime * _methaneDensity;
-                _oxygenProductionRate = -_part.RequestResource(_oxygenResourceName, -fixedOxygenProduction) / fixedDeltaTime * _oxygenDensity;
+                _methaneProductionRate = -_resources.RequestResource(_methaneResourceName, -fixedMethaneProduction) / fixedDeltaTime * _methaneDensity;
+                _oxygenProductionRate = -_resources.RequestResource(_oxygenResourceName, -fixedOxygenProduction) / fixedDeltaTime * _oxygenDensity;
             }
             else
             {
@@ -208,9 +208,9 @@ namespace FNPlugin.Refinery.Activity
 
         public override void PrintMissingResources()
         {
-            if (!_part.GetConnectedResources(_carbonDioxideResourceName).Any(rs => rs.amount > 0))
+            if (!_resources.GetConnectedResources(_carbonDioxideResourceName).Any(rs => rs.amount > 0))
                 ScreenMessages.PostScreenMessage(Localizer.Format("#LOC_KSPIE_SabatierReactor_Postmsg") + " " + _carbonDioxideResourceName, 3.0f, ScreenMessageStyle.UPPER_CENTER);//Missing
-            if (!_part.GetConnectedResources(_hydrogenResourceName).Any(rs => rs.amount > 0))
+            if (!_resources.GetConnectedResources(_hydrogenResourceName).Any(rs => rs.amount > 0))
                 ScreenMessages.PostScreenMessage(Localizer.Format("#LOC_KSPIE_SabatierReactor_Postmsg") + " " + _hydrogenResourceName, 3.0f, ScreenMessageStyle.UPPER_CENTER);//Missing
         }
     }

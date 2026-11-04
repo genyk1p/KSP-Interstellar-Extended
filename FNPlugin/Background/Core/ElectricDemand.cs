@@ -91,19 +91,25 @@ namespace FNPlugin.Background.Core
             return _lastRequest;
         }
 
-        /// <summary>Remembers what was really produced this step (after the fuel and heat limits).</summary>
-        public void Produced(double amountAtStart, double productionPerSecond, double elapsedSeconds)
+        /// <summary>
+        /// Remembers what was really produced this step (after the fuel and heat limits). <paramref name="drawnPerSecond"/>
+        /// is what the KSPIE consumers took from the battery in the same step: the battery change is measured against
+        /// production minus that (possibly negative), so it still measures the rest of the vessel only.
+        /// </summary>
+        public void Produced(double amountAtStart, double productionPerSecond, double elapsedSeconds, double drawnPerSecond = 0)
         {
-            if (!IsFinite(amountAtStart) || !IsFinite(productionPerSecond) || !IsFinite(elapsedSeconds) || elapsedSeconds <= 0)
+            if (!IsFinite(amountAtStart) || !IsFinite(productionPerSecond) || !IsFinite(elapsedSeconds) || elapsedSeconds <= 0
+                || !IsFinite(drawnPerSecond))
             {
                 _hasPrevious = false;
                 return;
             }
             _hasPrevious = true;
             _previousAmount = Math.Max(0, amountAtStart);
-            _previousProductionPerSecond = Math.Max(0, productionPerSecond);
+            var produced = Math.Max(0, productionPerSecond);
+            _previousProductionPerSecond = produced - Math.Max(0, drawnPerSecond);
             _previousElapsed = elapsedSeconds;
-            _previousLimited = _previousProductionPerSecond < _lastRequest * (1 - 1e-9);
+            _previousLimited = produced < _lastRequest * (1 - 1e-9);
         }
 
         private static bool IsFinite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);

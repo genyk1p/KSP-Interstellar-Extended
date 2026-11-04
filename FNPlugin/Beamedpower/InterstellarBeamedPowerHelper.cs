@@ -57,7 +57,9 @@ namespace FNPlugin.Beamedpower
                 return 0;
 
             Vector3d directionVector = (transmitPosition - receiver.Vessel.GetVesselPos()).normalized;
-            Transform receiverTransform = receiver.Part.transform;
+            // fork: an unloaded receiver (background step A3) has no part transform; it gives its saved orientation
+            var oriented = receiver as IBeamedPowerReceiverOrientation;
+            var receiverTransform = oriented == null ? new ReceiverAxes(receiver.Part.transform) : new ReceiverAxes(oriented);
 
             double facingFactor;
             switch (receiver.ReceiverType)
@@ -112,9 +114,29 @@ namespace FNPlugin.Beamedpower
                 facingFactor = 0;
 
             if (receiver.ReceiverType == 2)
-                facingFactor = Math.Max(facingFactor, Math.Round(0.4999 + Math.Max(0, Vector3d.Dot(receiver.Part.transform.up, directionVector))));
+                facingFactor = Math.Max(facingFactor, Math.Round(0.4999 + Math.Max(0, Vector3d.Dot(receiverTransform.up, directionVector))));
 
             return receiver.CanBeActiveInAtmosphere ? facingFactor : receiver.HighSpeedAtmosphereFactor * facingFactor;
+        }
+
+        /// <summary>The receiver's axes in world space: from its part, or from an unloaded receiver's saved orientation.</summary>
+        private struct ReceiverAxes
+        {
+            public readonly Vector3d up, forward, right;
+
+            public ReceiverAxes(Transform transform)
+            {
+                up = transform.up;
+                forward = transform.forward;
+                right = transform.right;
+            }
+
+            public ReceiverAxes(IBeamedPowerReceiverOrientation orientation)
+            {
+                up = orientation.Up;
+                forward = orientation.Forward;
+                right = orientation.Right;
+            }
         }
 
         private static double ComputeVisibilityAndDistance(VesselRelayPersistence relay, Vessel targetVessel)

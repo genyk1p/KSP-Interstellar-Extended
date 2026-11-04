@@ -2372,8 +2372,12 @@ namespace FNPlugin.Reactors
             if (_currentFuelMode == null || variant == null || !CanRunInBackground || !IsEnabled)
             {
                 node.SetValue(Background.BackgroundSnapshot.Active, "False", true);
+                // running but not modelled (fusion plasma upkeep, no fuel mode): the vessel's power is not known
+                // completely, its consumers must not run on the rest of it (BackgroundSnapshot.PowerUnknown)
+                node.SetValue(Background.BackgroundSnapshot.PowerUnknown, IsEnabled.ToString(), true);
                 return;
             }
+            node.SetValue(Background.BackgroundSnapshot.PowerUnknown, "False", true);
 
             // what the reactor can supply (and bills fuel for): the part of the power lost in the reactor
             // (lostThermalPowerRatio 0.975 on antimatter cores) is neither delivered nor burnt, as in OnFixedUpdate

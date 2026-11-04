@@ -66,8 +66,8 @@ namespace FNPlugin.Refinery.Activity
             if (_monoxideResourceName == null || _hydrogenResourceName == null || _methaneResourceName == null || _oxygenResourceName == null)
                 return false;
 
-            return _part.GetConnectedResources(_methaneResourceName).Any(rs => rs.amount > 0) &
-                   _part.GetConnectedResources(_oxygenResourceName).Any(rs => rs.amount > 0);
+            return _resources.GetConnectedResources(_methaneResourceName).Any(rs => rs.amount > 0) &
+                   _resources.GetConnectedResources(_oxygenResourceName).Any(rs => rs.amount > 0);
         }
 
 
@@ -92,10 +92,10 @@ namespace FNPlugin.Refinery.Activity
             _current_rate = CurrentPower / EnergyPerTon;
 
             // determine how much resource we have
-            var partsThatContainMonoxide = _part.GetConnectedResources(_monoxideResourceName).ToList();
-            var partsThatContainHydrogen = _part.GetConnectedResources(_hydrogenResourceName).ToList();
-            var partsThatContainMethane = _part.GetConnectedResources(_methaneResourceName).ToList();
-            var partsThatContainOxygen = _part.GetConnectedResources(_oxygenResourceName).ToList();
+            var partsThatContainMonoxide = _resources.GetConnectedResources(_monoxideResourceName).ToList();
+            var partsThatContainHydrogen = _resources.GetConnectedResources(_hydrogenResourceName).ToList();
+            var partsThatContainMethane = _resources.GetConnectedResources(_methaneResourceName).ToList();
+            var partsThatContainOxygen = _resources.GetConnectedResources(_oxygenResourceName).ToList();
 
             // determine the maximum amount of a resource the vessel can hold (ie. tank capacities combined)
             _maxCapacityMonoxideMass = partsThatContainMonoxide.Sum(p => p.maxAmount) * _monoxideDensity;
@@ -135,16 +135,16 @@ namespace FNPlugin.Refinery.Activity
                 _consumptionStorageRatio = Math.Min(fixedMaxPossibleMonoxideRate / fixedMaxMonoxideRate, fixedMaxPossibleHydrogenRate / fixedMaxHydrogenRate);
 
                 // this consumes the resources
-                _oxygenConsumptionRate = _part.RequestResource(_oxygenResourceName, OxygenMassByFraction * _consumptionStorageRatio * _fixedConsumptionRate / _oxygenDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _oxygenDensity;
-                _methaneConsumptionRate = _part.RequestResource(_methaneResourceName, MethaneMassByFraction * _consumptionStorageRatio * _fixedConsumptionRate / _methaneDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _methaneDensity;
+                _oxygenConsumptionRate = _resources.RequestResource(_oxygenResourceName, OxygenMassByFraction * _consumptionStorageRatio * _fixedConsumptionRate / _oxygenDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _oxygenDensity;
+                _methaneConsumptionRate = _resources.RequestResource(_methaneResourceName, MethaneMassByFraction * _consumptionStorageRatio * _fixedConsumptionRate / _methaneDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _methaneDensity;
                 _combinedConsumptionRate = _oxygenConsumptionRate + _methaneConsumptionRate;
 
                 // this produces the products
                 var monoxideRateTemp = _combinedConsumptionRate * MonoxideMassByFraction;
                 var waterRateTemp = _combinedConsumptionRate * HydrogenMassByFraction;
 
-                _monoxideProductionRate = -_part.RequestResource(_monoxideResourceName, -monoxideRateTemp * fixedDeltaTime / _monoxideDensity) / fixedDeltaTime * _monoxideDensity;
-                _hydrogenProductionRate = -_part.RequestResource(_hydrogenResourceName, -waterRateTemp * fixedDeltaTime / _hydrogenDensity) / fixedDeltaTime * _hydrogenDensity;
+                _monoxideProductionRate = -_resources.RequestResource(_monoxideResourceName, -monoxideRateTemp * fixedDeltaTime / _monoxideDensity) / fixedDeltaTime * _monoxideDensity;
+                _hydrogenProductionRate = -_resources.RequestResource(_hydrogenResourceName, -waterRateTemp * fixedDeltaTime / _hydrogenDensity) / fixedDeltaTime * _hydrogenDensity;
             }
             else
             {
@@ -222,9 +222,9 @@ namespace FNPlugin.Refinery.Activity
 
         public override void PrintMissingResources()
         {
-            if (!_part.GetConnectedResources(_methaneResourceName).Any(rs => rs.amount > 0))
+            if (!_resources.GetConnectedResources(_methaneResourceName).Any(rs => rs.amount > 0))
                 ScreenMessages.PostScreenMessage(Localizer.Format("#LOC_KSPIE_PartialOxiMethane_Postmsg") + " " + _methaneResourceName, 3.0f, ScreenMessageStyle.UPPER_CENTER);//Missing
-            if (!_part.GetConnectedResources(_oxygenResourceName).Any(rs => rs.amount > 0))
+            if (!_resources.GetConnectedResources(_oxygenResourceName).Any(rs => rs.amount > 0))
                 ScreenMessages.PostScreenMessage(Localizer.Format("#LOC_KSPIE_PartialOxiMethane_Postmsg") + " " + _oxygenResourceName, 3.0f, ScreenMessageStyle.UPPER_CENTER);//Missing
         }
     }

@@ -2,6 +2,7 @@
 using FNPlugin.Extensions;
 using FNPlugin.Powermanagement;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace FNPlugin.Resources
@@ -67,9 +68,50 @@ namespace FNPlugin.Resources
             canCollect = _moduleAnimateGeneric == null ? true :  _moduleAnimateGeneric.GetScalar == 1;
         }
 
+        // background (Background/BackgroundConsumers, todo/kspie-rails-warp.md A2): values kept from load until the
+        // collector has run in this flight
+        private ConfigNode _loadedBackgroundValues;
+        private bool _backgroundReady;
+        private bool _backgroundErrorLogged;
+
+        public override void OnLoad(ConfigNode node)
+        {
+            base.OnLoad(node);
+            _loadedBackgroundValues = Background.BackgroundSnapshot.CopyBackgroundValues(node);
+        }
+
+        public override void OnSave(ConfigNode node)
+        {
+            base.OnSave(node);
+            if (HighLogic.LoadedSceneIsFlight)
+                Background.BackgroundSnapshot.Save(this, node, _backgroundReady, _loadedBackgroundValues, SaveBackgroundValues, ref _backgroundErrorLogged);
+        }
+
+        /// <summary>
+        /// Antimatter collected per second at full power, averaged over the orbit as the catch-up in OnStart does it
+        /// (mean altitude, half at the orbit's inclination, half at the equator).
+        /// </summary>
+        private void SaveBackgroundValues(ConfigNode node)
+        {
+            var outputs = new List<KeyValuePair<string, double>>();
+            var active = this.active && canCollect && _antimatterDef != null && _homeworld != null && vessel.orbit.eccentricity < 1;
+            if (active)
+            {
+                var vesselAvgAlt = (vessel.orbit.ApA + vessel.orbit.PeA) / 2;
+                var averageFlux = collectionMultiplier * 0.5 * (vessel.mainBody.GetBeltAntiparticles(_homeworld, vesselAvgAlt, vessel.orbit.inclination)
+                    + vessel.mainBody.GetBeltAntiparticles(_homeworld, vesselAvgAlt, 0.0));
+                if (averageFlux > 0 && !double.IsInfinity(averageFlux))
+                    outputs.Add(new KeyValuePair<string, double>(_antimatterDef.name, averageFlux));
+            }
+            // FixedUpdate: ConsumeMegawatts with ElectricCharge allowed
+            Background.BackgroundConsumers.WriteRecipe(node, active && outputs.Count > 0, powerReqKW / GameConstants.ecPerMJ,
+                getPowerPriority(), 0, 0, true, null, outputs, nameof(last_active_time));
+        }
+
         public void FixedUpdate()
         {
             if (!HighLogic.LoadedSceneIsFlight) return;
+            _backgroundReady = true;
 
             if (!active || !canCollect)
             {

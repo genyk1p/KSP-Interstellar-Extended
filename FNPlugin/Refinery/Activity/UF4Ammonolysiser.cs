@@ -29,8 +29,8 @@ namespace FNPlugin.Refinery.Activity
 
         public override bool HasActivityRequirements()
         {
-            return _part.GetConnectedResources(ResourceSettings.Config.UraniumTetraflouride)
-                .Any(rs => rs.amount > 0) && _part.GetConnectedResources(ResourceSettings.Config.AmmoniaLqd).Any(rs => rs.amount > 0);
+            return _resources.GetConnectedResources(ResourceSettings.Config.UraniumTetraflouride)
+                .Any(rs => rs.amount > 0) && _resources.GetConnectedResources(ResourceSettings.Config.AmmoniaLqd).Any(rs => rs.amount > 0);
         }
 
         public override void Initialize(Part localPart, InterstellarRefineryController controller)
@@ -48,11 +48,11 @@ namespace FNPlugin.Refinery.Activity
             _current_rate = CurrentPower / EnergyPerTon;
             double uf4Fraction = _current_rate * 1.24597 / _uraniumTetrafluorideDensity;
             double ammoniaFraction = _current_rate * 0.901 / _ammoniaDensity;
-            _uraniumTetrafluorideConsumptionRate = _part.RequestResource(ResourceSettings.Config.UraniumTetraflouride, uf4Fraction * fixedDeltaTime, ResourceFlowMode.ALL_VESSEL) * _uraniumTetrafluorideDensity / fixedDeltaTime;
-            _ammoniaConsumptionRate = _part.RequestResource(ResourceSettings.Config.AmmoniaLqd, ammoniaFraction * fixedDeltaTime, ResourceFlowMode.ALL_VESSEL) * _ammoniaDensity / fixedDeltaTime;
+            _uraniumTetrafluorideConsumptionRate = _resources.RequestResource(ResourceSettings.Config.UraniumTetraflouride, uf4Fraction * fixedDeltaTime, ResourceFlowMode.ALL_VESSEL) * _uraniumTetrafluorideDensity / fixedDeltaTime;
+            _ammoniaConsumptionRate = _resources.RequestResource(ResourceSettings.Config.AmmoniaLqd, ammoniaFraction * fixedDeltaTime, ResourceFlowMode.ALL_VESSEL) * _ammoniaDensity / fixedDeltaTime;
 
             if (_ammoniaConsumptionRate > 0 && _uraniumTetrafluorideConsumptionRate > 0)
-                _uraniumNitrideProductionRate = -_part.RequestResource(ResourceSettings.Config.UraniumNitride, -_uraniumTetrafluorideConsumptionRate / 1.24597 / _uraniumNitrideDensity * fixedDeltaTime, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _uraniumNitrideDensity;
+                _uraniumNitrideProductionRate = -_resources.RequestResource(ResourceSettings.Config.UraniumNitride, -_uraniumTetrafluorideConsumptionRate / 1.24597 / _uraniumNitrideDensity * fixedDeltaTime, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _uraniumNitrideDensity;
 
             UpdateStatusMessage();
         }
@@ -103,9 +103,9 @@ namespace FNPlugin.Refinery.Activity
         }
         public override void PrintMissingResources()
         {
-            if (!_part.GetConnectedResources(ResourceSettings.Config.AmmoniaLqd).Any(rs => rs.amount > 0))
+            if (!_resources.GetConnectedResources(ResourceSettings.Config.AmmoniaLqd).Any(rs => rs.amount > 0))
                 ScreenMessages.PostScreenMessage(Localizer.Format("#LOC_KSPIE_UF4Ammonolysiser_Postmsg") + " " + ResourceSettings.Config.AmmoniaLqd, 3.0f, ScreenMessageStyle.UPPER_CENTER);//Missing
-            if (!_part.GetConnectedResources(ResourceSettings.Config.UraniumTetraflouride).Any(rs => rs.amount > 0))
+            if (!_resources.GetConnectedResources(ResourceSettings.Config.UraniumTetraflouride).Any(rs => rs.amount > 0))
                 ScreenMessages.PostScreenMessage(Localizer.Format("#LOC_KSPIE_UF4Ammonolysiser_Postmsg") + " " + ResourceSettings.Config.UraniumTetraflouride, 3.0f, ScreenMessageStyle.UPPER_CENTER);//Missing
         }
     }

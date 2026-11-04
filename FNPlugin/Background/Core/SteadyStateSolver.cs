@@ -45,6 +45,12 @@ namespace FNPlugin.Background.Core
             public readonly double[] Capacity, ThermalDrawn, ChargedDrawn;
             public readonly bool[] HasGenerator;
             public double TotalCapacity;
+            /// <summary>
+            /// Waste heat made elsewhere on the vessel when the plant delivers a given electric power, MW: the
+            /// consumers' heat for the power they get (PowerAllocation.ConsumerHeat) and the beamed power receivers'
+            /// conversion heat. Null = none.
+            /// </summary>
+            public Func<double, double> ExtraHeat;
 
             public Work(VesselSpec spec)
             {
@@ -155,11 +161,50 @@ namespace FNPlugin.Background.Core
 
         private static double NonNegative(double value) => double.IsNaN(value) || double.IsInfinity(value) || value < 0 ? 0 : value;
 
-        public static SteadyState Solve(VesselSpec spec, double requestedElectricMW)
+        public static SteadyState Solve(VesselSpec spec, double requestedElectricMW) =>
+            Solve(spec, requestedElectricMW, null);
+
+        /// <summary>
+        /// The most the generators can make at all (coldest radiators, highest efficiency, reactors at full power), MW:
+        /// the upper bound of KSPIE's stable supply, which is the same at the radiators' current temperature
+        /// (SteadyState.CapacityMW, StepPlan.StableSupply). 0 without radiators or generators (KSPIE generators make
+        /// nothing then).
+        /// </summary>
+        public static double MaximumElectricMW(VesselSpec spec)
+        {
+            if (spec == null) throw new ArgumentNullException(nameof(spec));
+            var work = new Work(spec);
+            if (work.RadiatorCount == 0 || work.GeneratorCount == 0)
+                return 0;
+            Evaluate(work, 0, 0, NewState(spec, 0));
+            return NonNegative(work.TotalCapacity);
+        }
+
+        /// <summary>
+        /// Operating point for <paramref name="requestedElectricMW"/> of electricity, of which the part above
+        /// <paramref name="heatFreeElectricMW"/> goes to KSPIE consumers that turn <paramref name="consumerHeatFraction"/>
+        /// of it back into waste heat, plus <paramref name="extraHeatMW"/> of heat from elsewhere (a simple form of
+        /// <see cref="Solve(VesselSpec, double, Func{double, double})"/>, used by the tests).
+        /// </summary>
+        public static SteadyState Solve(VesselSpec spec, double requestedElectricMW, double heatFreeElectricMW, double consumerHeatFraction, double extraHeatMW = 0)
+        {
+            var heatFree = double.IsNaN(heatFreeElectricMW) || heatFreeElectricMW < 0 ? 0 : heatFreeElectricMW;
+            var fraction = Math.Min(1, NonNegative(consumerHeatFraction));
+            var extra = NonNegative(extraHeatMW);
+            return Solve(spec, requestedElectricMW, electric => fraction * Math.Max(0, electric - heatFree) + extra);
+        }
+
+        /// <summary>
+        /// Operating point for <paramref name="requestedElectricMW"/> of electricity, with
+        /// <paramref name="extraHeatOfElectricMW"/>(delivered electric MW) of waste heat made elsewhere on the vessel —
+        /// the consumers turning part of the power they get back into heat (the metallic hydrogen factory: 99.9 %),
+        /// beamed power receivers' conversion. NaN, infinite or negative results count as 0.
+        /// </summary>
+        public static SteadyState Solve(VesselSpec spec, double requestedElectricMW, Func<double, double> extraHeatOfElectricMW)
         {
             if (spec == null) throw new ArgumentNullException(nameof(spec));
 
-            var work = new Work(spec);
+            var work = new Work(spec) { ExtraHeat = extraHeatOfElectricMW };
             var requested = NonNegative(requestedElectricMW);
             var state = NewState(spec, requested);
             var maxFill = MaximumFill(spec);
@@ -183,8 +228,12 @@ namespace FNPlugin.Background.Core
                 return state;
             }
 
+            // (the last Evaluate of Find, and below, is at the state's fill: TotalCapacity is the capacity there)
             if (Find(work, requested, maxFill, state) == Outcome.Balanced)
+            {
+                state.CapacityMW = NonNegative(work.TotalCapacity);
                 return state;
+            }
 
             // the largest power that still has an equilibrium below the overheat threshold
             double low = 0, high = requested;
@@ -218,6 +267,7 @@ namespace FNPlugin.Background.Core
             }
             state.RequestedElectricMW = NonNegative(requestedElectricMW);
             state.HeatLimited = heatLimited;
+            state.CapacityMW = NonNegative(work.TotalCapacity);
             return state;
         }
 
@@ -405,6 +455,9 @@ namespace FNPlugin.Background.Core
                 state.ReactorPowerRatio[r] = ratio;
                 waste += ratio * work.Thermal[r] + work.ChargedWaste[r] * ratio * work.Charged[r];
             }
+
+            if (work.ExtraHeat != null)
+                waste += NonNegative(work.ExtraHeat(electricMW));
 
             state.ElectricMW = electricMW;
             state.WasteHeatMW = Math.Max(0, waste);

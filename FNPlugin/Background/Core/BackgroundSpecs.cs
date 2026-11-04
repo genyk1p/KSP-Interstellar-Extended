@@ -122,6 +122,12 @@ namespace FNPlugin.Background.Core
         public double ElectricMW;
         /// <summary>Electric power asked for, MW.</summary>
         public double RequestedElectricMW;
+        /// <summary>
+        /// What the generators could make at the radiators' temperature of this operating point, MW — KSPIE's stable
+        /// supply on a loaded vessel (generator maximum at the current efficiency). 0 when the plant is stopped or
+        /// has no radiators or generators.
+        /// </summary>
+        public double CapacityMW;
         /// <summary>Fill fraction of the waste heat bar at equilibrium.</summary>
         public double WasteHeatFill;
         /// <summary>Waste heat produced (= radiated at equilibrium), MW.</summary>

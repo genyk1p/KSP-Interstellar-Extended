@@ -78,20 +78,83 @@ commit `3b495342` (upstream master on 2026-10-31).
   point instead of not at all. Upstream, an unloaded KSPIE vessel made no ElectricCharge (Kerbalism only saw its
   consumption) and the reactor billed all the fuel at once when the vessel was loaded again. The reactor, generator
   and radiator modules write what they computed while loaded into the save (`bg*` keys, flight only);
-  `InterstellarBackgroundPower` (added to every reactor part, only with Kerbalism) finds the heat balance (radiator
+  `InterstellarBackgroundPower` (added to every reactor part — and, since A2/A3, consumer, transmitter and receiver
+  part —, only with Kerbalism) finds the heat balance (radiator
   temperature, generator efficiency, minimum throttle) for the vessel's electric demand, burns the fuel, makes the
   products, breeds tritium and moves the reactor's own catch-up time forward. The electric demand of the rest of the
   vessel is measured from the battery between steps (held at 98%). The model (`Background/Core`) references no KSP
   assembly and is tested by `Background.Tests` (`dotnet test`). A vessel gets it after one load with this version.
   A reactor is run by the model completely or not at all: reactors whose power also goes where the model does not
   follow keep their own catch-up on load — fusion reactors (plasma upkeep power), reactors with an MHD generator or
-  no generator (engines), every reactor of a vessel with a beamed power transmitter on, and fuel modes run by a
-  Kerbalism process. The stock ModuleGenerator that FNGenerator switches on is switched off in the snapshot of a
+  no generator (engines), every reactor of a vessel with a beamed power transmitter saved before A3, and fuel modes run
+  by a Kerbalism process. The stock ModuleGenerator that FNGenerator switches on is switched off in the snapshot of a
   modelled generator's part: Kerbalism's own background made its config output for free (2000 EC/s on the liquid
-  metal reactor) on top of the reactor. Not modelled: ISRU and other MJ consumers, convection in an atmosphere,
-  radioactive decay of stored resources; a fuel or product kept inside the reactor (consumeGlobal / produceGlobal =
-  false) stops the reactor or is dropped when the reactor's own store is empty or full, but Kerbalism takes and puts
-  them in any tank of the vessel.
+  metal reactor) on top of the reactor. Not modelled: convection in an atmosphere, radioactive decay of stored
+  resources (FNRadioactiveDecay catches it up on load); a fuel or product kept inside the reactor (consumeGlobal /
+  produceGlobal = false) stops the reactor or is dropped when the reactor's own store is empty or full, but Kerbalism
+  takes and puts them in any tank of the vessel.
+- Background consumers of electric power (step A2; `Background/BackgroundConsumers.cs`, `Background/Core/ResourceLedger.cs`,
+  `Background/Core/PowerAllocation.cs`, `Background/Core/StepPlan.cs`, `Refinery/RefineryResources.cs`): on an unloaded
+  vessel the ISRU refinery, the universal drill, the regolith collector, the antimatter and metallic hydrogen factories
+  and the antimatter collector run in the same Kerbalism step as the reactors. The refinery runs its activity's own
+  `UpdateFrame` on a ledger of the vessel's stock (after the reactors' share of the step): every resource call of the 19
+  activities goes through `RefineryResources` (loaded: the part's calls, unchanged; background: the ledger), and the
+  crossfeed of the part is kept (a resource the part could not reach through crossfeed when saved — `bgUnreachable` —
+  is empty for the crossfeed-bound calls, as in the game). The other modules write at save time what they take and
+  make per second at full power where they are (`bgInputs`, `bgOutputs`; the antimatter collector averaged over the
+  orbit, as its catch-up); the step scales that by the power received. The factories and the transmitter ask, as
+  loaded, for slider × min(capacity, the plant's stable supply) — the generators' maximum at the radiators' working
+  temperature plus the electric receivers, less the battery charge; the working temperature depends on what they draw,
+  so the step finds the steady state (`StepPlan.StableSupply`, `SteadyState.CapacityMW`). Power as KSPIE's megajoule manager shares it:
+  the battery charge for the rest of the vessel first, then the consumers by KSPIE priority, within a priority the
+  smallest request first (FnResourceFlowTypeSmallestFirst); what the generators cannot give, the consumers that take
+  ElectricCharge on a loaded vessel (refinery, antimatter collector, drill under 5 MW, regolith collector under 2 MW —
+  not the factories nor the transmitter) take from the battery down to half; the heat of the consumers the reactors
+  power (metallic hydrogen factory 99.9 %, regolith collector, transmitter) enters the plant's heat balance (the heat
+  of what runs on the battery does not). A consumer that ran moves its own catch-up time forward. Billed only (its
+  power is drawn, its catch-up time stays, it produces on load at the share of its power billed, averaged over the
+  steps since that time and written into `lastPowerRatio`): the atmosphere and sea water processes (scoop and intakes
+  of the loaded vessel) and nuclear fuel reprocessing (the reactors' own stores).
+  The whole plant keeps its own catch-up, consumers included, as without the model, when the vessel has a consumer
+  the model can neither run nor bill (unknown activity, unreadable values, a transmitter whose beam generator is
+  missing, a KSPIE module that takes megajoules and catches up on load but has no background model: the AI computer
+  core, the science lab in antimatter mode, the solar wind collector) or has consumers and power the model does not
+  know completely (a running fusion reactor — also one saved by the A1 build —, an MHD generator, a receiver the model
+  does not run or whose bands it cannot read, a generator fed by an unknown source, a second reactor or thermal
+  receiver on one part, a module whose values could not be written or read), and from the step a consumer throws on.
+  Such a plant's stock ModuleGenerators are left as KSPIE saved them: Kerbalism's own background makes their EC while
+  the reactor's catch-up bills its fuel on load (upstream behaviour; switching them off would leave life support
+  without power). Not modelled, with no effect on the plant: KSPIE megajoule sources other than reactors and
+  receivers (FNBatteryGenerator) — megajoule-only consumers get less than loaded; the regolith processor fed directly
+  by collectors without a regolith tank (it finds the collectors on the loaded vessel only). The drill's and regolith collector's
+  catch-up multiplied the time by 55 — now the real time (KNOWN_ISSUES L12). The Haber process reads its stock in
+  HasActivityRequirements, which the background calls before every UpdateFrame. The Kerbalism broker is now called
+  "KSPIE" (was "KSPIE reactors").
+- Beamed power in the background (step A3; `Background/BackgroundBeams.cs`, `Background/Core/BeamReception.cs`,
+  `Background/Core/BeamRules.cs`): an unloaded transmitter is a consumer of its vessel's power (slider × min(capacity,
+  stable supply), as loaded; heat 1 − efficiency): its reactors burn fuel for the beam step by step, and the step writes
+  the beam into the transmitter's node (`nuclear_power`, less the saved `solar_power`, as FixedUpdate), where KSPIE's
+  BeamedPowerSources reads unloaded transmitters for the receivers — the beam follows the transmitter's power (fuel
+  out: no beam). The saved `solar_power` stays (KSPIE beams the solar cells' power even with Kerbalism, where they give
+  no megajoules, and scales it by the sun when unloaded); a broken beam generator beams nothing. Upstream, an unloaded transmitter kept
+  beaming its last saved power for free and its reactor billed the fuel on load. The beam generator's wear goes on in
+  its own node. An unloaded receiver finds its routes with KSPIE's own InterstellarBeamedPowerHelper.GetConnectedTransmitters
+  (its orientation from the snapshot: the helper takes an `IBeamedPowerReceiverOrientation` where it used the part
+  transform) and takes from each transmitter what CalculateInputPower would (`BeamReception`). Unloaded receivers count
+  each other's last received power against a transmitter (Kerbalism runs unloaded vessels one at a time; recorded
+  once the step succeeded, per receiver module — a part may carry two), as loaded receivers count each other (whose
+  count is added); loaded receivers do not see what unloaded ones take. An electric
+  mode receiver gives megajoules, used before the reactors; a thermal mode receiver is a fuel-less pseudo-reactor its
+  generators attach to. A receiver in solar thermal, slave or master mode is not modelled (the vessel's power counts as
+  not known completely); one switched off or in radiator mode gives nothing. A vessel with a transmitter saved before
+  this version keeps its reactors on the catch-up until it is loaded once.
+  BeamedPowerSources (KSPIE's list of transmitters and relays) now lives in every game scene — Kerbalism runs unloaded
+  vessels in the space center and tracking station too — one instance per scene, starting empty: upstream it was a
+  flight addon with DontDestroyOnLoad and once=false, an instance piled up per flight scene and outside flight the
+  last one kept the previous scene's (destroyed) vessels. It also drops vessels gone from the game without becoming
+  DEAD (recovered or terminated in the tracking station, merged by docking): upstream they stayed listed with their
+  last power and the receivers' routing threw on their destroyed transform. Until it has filled its lists on the first
+  frames of a scene, a receiver keeps its last intake (kept across scenes, emptied when another save folder is loaded).
 - `InterstellarReactor.OnStart`: the power slider's minimum is set only when the control is a slider. In game a
   molten salt reactor had `UI_Label` controls there (cause not found); the NullReferenceException aborted OnStart and
   the reactor threw on every FixedUpdate.

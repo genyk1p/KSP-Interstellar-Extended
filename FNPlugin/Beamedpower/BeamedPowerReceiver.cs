@@ -1091,6 +1091,66 @@ namespace FNPlugin.Beamedpower
         {
             part.temperature = storedTemp;
             part.skinTemperature = storedTemp;
+            _loadedBackgroundValues = Background.BackgroundSnapshot.CopyBackgroundValues(node);
+        }
+
+        // background (Background/BackgroundBeams, todo/kspie-rails-warp.md A3): values kept from load until the receiver
+        // has run in this flight
+        private ConfigNode _loadedBackgroundValues;
+        private bool _backgroundReady;
+        private bool _backgroundErrorLogged;
+
+        public override void OnSave(ConfigNode node)
+        {
+            base.OnSave(node);
+            if (HighLogic.LoadedSceneIsFlight)
+                Background.BackgroundSnapshot.Save(this, node, _backgroundReady, _loadedBackgroundValues, SaveBackgroundValues, ref _backgroundErrorLogged);
+        }
+
+        /// <summary>
+        /// What the background step needs to receive beamed power on an unloaded vessel (CalculateInputPower and
+        /// OnFixedUpdateResourceSuppliable): the receiver's geometry for KSPIE's own routing, its capacities, mode and
+        /// bandwidth efficiencies. Not modelled (bgModelled = False: the vessel's power counts as not known completely):
+        /// solar thermal input, thermal receiver slaves and masters. Off, or in radiator mode: bgActive = False, it gives
+        /// no power.
+        /// </summary>
+        private void SaveBackgroundValues(ConfigNode node)
+        {
+            var receiving = receiverIsEnabled && !radiatorMode && !solarPowerMode;
+            var solarThermal = solarReceptionSurfaceArea > 0 && solarReceptionEfficiency > 0;
+            var modelled = !solarThermal && !isThermalReceiverSlave && thermalReceiverSlaves.Count == 0;
+            node.SetValue(Background.BackgroundBeams.ReceiverMarker, "True", true);
+            node.SetValue(Background.BackgroundSnapshot.Active, ((receiverIsEnabled && !radiatorMode) && (receiving || solarThermal)).ToString(), true);
+            node.SetValue(Background.BackgroundBeams.Modelled, modelled.ToString(), true);
+            node.SetValue(Background.BackgroundBeams.ReceivesBeams, receiving.ToString(), true);
+            node.SetValue(Background.BackgroundBeams.ThermalMode, (thermalMode || isThermalReceiverSlave).ToString(), true);
+
+            var capacity = MaximumReceiverPowerCapacity;
+            node.SetValue(Background.BackgroundBeams.CapacityMW, Background.BackgroundSnapshot.Number(capacity), true);
+            node.SetValue(Background.BackgroundBeams.BeamCapacityMW, Background.BackgroundSnapshot.Number(Math.Min(capacity * PowerRatio, capacity * PowerCapacityEfficiency)), true);
+            node.SetValue(Background.BackgroundBeams.ElectricFactor, Background.BackgroundSnapshot.Number(WasteheatElectricConversionEfficiency * electricMaxEfficiency), true);
+            node.SetValue(Background.BackgroundBeams.MinimumRatio, Background.BackgroundSnapshot.Number(minimumConsumptionPercentage / 100d), true);
+            node.SetValue(Background.BackgroundSnapshot.HotBathK, Background.BackgroundSnapshot.Number(HotBathTemperature), true);
+
+            node.SetValue(Background.BackgroundBeams.Diameter, Background.BackgroundSnapshot.Number(Diameter), true);
+            node.SetValue(Background.BackgroundBeams.ApertureMultiplier, Background.BackgroundSnapshot.Number(ApertureMultiplier), true);
+            node.SetValue(Background.BackgroundBeams.ReceiverType, ReceiverType.ToString(System.Globalization.CultureInfo.InvariantCulture), true);
+            node.SetValue(Background.BackgroundBeams.MinimumWavelength, Background.BackgroundSnapshot.Number(MinimumWavelength), true);
+            node.SetValue(Background.BackgroundBeams.MaximumWavelength, Background.BackgroundSnapshot.Number(MaximumWavelength), true);
+            node.SetValue(Background.BackgroundBeams.HighSpeedAtmosphereFactor, Background.BackgroundSnapshot.Number(HighSpeedAtmosphereFactor), true);
+            node.SetValue(Background.BackgroundBeams.FacingThreshold, Background.BackgroundSnapshot.Number(FacingThreshold), true);
+            node.SetValue(Background.BackgroundBeams.FacingSurfaceExponent, Background.BackgroundSnapshot.Number(FacingSurfaceExponent), true);
+            node.SetValue(Background.BackgroundBeams.FacingEfficiencyExponent, Background.BackgroundSnapshot.Number(FacingEfficiencyExponent), true);
+            node.SetValue(Background.BackgroundBeams.SpotsizeNormalizationExponent, Background.BackgroundSnapshot.Number(SpotsizeNormalizationExponent), true);
+            node.SetValue(Background.BackgroundBeams.CanBeActiveInAtmosphere, CanBeActiveInAtmosphere.ToString(), true);
+
+            // the bands CalculateInputPower selects from: the active one when switchable (for every wavelength), else all
+            node.SetValue(Background.BackgroundBeams.SingleBand, canSwitchBandwidthInEditor.ToString(), true);
+            var bands = canSwitchBandwidthInEditor
+                ? (activeBandwidthConfiguration != null ? new List<BandwidthConverter> { activeBandwidthConfiguration } : new List<BandwidthConverter>())
+                : BandwidthConverters;
+            node.SetValue(Background.BackgroundBeams.Bands, Background.BackgroundBeams.WriteBands(bands.Select(b =>
+                new[] { b.minimumWavelength, b.maximumWavelength, b.MaxElectricEfficiencyPercentage, b.MaxThermalEfficiencyPercentage })), true);
         }
 
         private void InitializeThermalModeSwitcher()
@@ -1490,6 +1550,7 @@ namespace FNPlugin.Beamedpower
 
         public override void OnFixedUpdateResourceSuppliable(double fixedDeltaTime)
         {
+            _backgroundReady = true;
             RequestedThermalThrottle = _connectedEngines.Any(m => m.RequiresThermalHeat) ? Math.Min(1, _connectedEngines.Where(m => m.RequiresPlasmaHeat).Sum(e => e.RequestedThrottle)) : 0;
             RequestedPlasmaThrottle = _connectedEngines.Any(m => m.RequiresPlasmaHeat) ? Math.Min(1, _connectedEngines.Where(m => m.RequiresPlasmaHeat).Sum(e => e.RequestedThrottle)) : 0;
             RequestedChargedThrottle = _connectedEngines.Any(m => m.RequiresChargedPower) ? Math.Min(1, _connectedEngines.Where(m => m.RequiresPlasmaHeat).Sum(e => e.RequestedThrottle)) : 0;

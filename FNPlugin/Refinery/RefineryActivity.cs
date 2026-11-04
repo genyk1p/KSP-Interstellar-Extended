@@ -15,6 +15,11 @@ namespace FNPlugin.Refinery
 
         protected Part _part;
         protected Vessel _vessel;
+        /// <summary>
+        /// Every resource read and request of the activity goes here: the part's vessel when loaded, the background
+        /// step's ledger on an unloaded vessel (<see cref="InitializeForBackground"/>).
+        /// </summary>
+        protected RefineryResources _resources;
         protected GUIStyle _bold_label;
         protected GUIStyle _value_label;
         protected GUIStyle _value_label_green;
@@ -61,7 +66,9 @@ namespace FNPlugin.Refinery
         public virtual void Initialize(Part localPart, InterstellarRefineryController controller)
         {
             _part = localPart;
-            _vessel = localPart.vessel;
+            if (_resources == null)
+                _resources = new PartRefineryResources(localPart);
+            _vessel = _resources.Vessel;
             _refineryController = controller;
 
             if (Events != null)
@@ -69,6 +76,16 @@ namespace FNPlugin.Refinery
                 _toggleEvent = Events[nameof(ToggleWindow)];
                 _toggleEvent.guiActive = true;
             }
+        }
+
+        /// <summary>
+        /// Sets up a fresh instance for an unloaded vessel (Background/BackgroundConsumers): the part is the prefab
+        /// (no vessel, no window), resources go through <paramref name="resources"/>.
+        /// </summary>
+        public void InitializeForBackground(Part prefab, RefineryResources resources)
+        {
+            _resources = resources;
+            Initialize(prefab, null);
         }
 
         public override void OnUpdate()

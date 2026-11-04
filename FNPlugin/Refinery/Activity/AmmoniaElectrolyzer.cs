@@ -38,7 +38,7 @@ namespace FNPlugin.Refinery.Activity
             if (_ammoniaResourceName == null || _nitrogenResourceName == null || _hydrogenResourceName == null)
                 return false;
 
-            return _part.GetConnectedResources(_ammoniaResourceName).Any(rs => rs.amount > 0);
+            return _resources.GetConnectedResources(_ammoniaResourceName).Any(rs => rs.amount > 0);
         }
 
         public override void Initialize(Part localPart, InterstellarRefineryController controller)
@@ -59,8 +59,8 @@ namespace FNPlugin.Refinery.Activity
             _current_power = PowerRequirements * rateMultiplier;
             _currentMassRate = (CurrentPower / EnergyPerTon);
 
-            var spareCapacityNitrogen = _part.GetResourceSpareCapacity(_nitrogenResourceName);
-            var spareCapacityHydrogen = _part.GetResourceSpareCapacity(_hydrogenResourceName);
+            var spareCapacityNitrogen = _resources.GetResourceSpareCapacity(_nitrogenResourceName);
+            var spareCapacityHydrogen = _resources.GetResourceSpareCapacity(_hydrogenResourceName);
 
             var maxNitrogenMassRate = (_currentMassRate * (1 - GameConstants.ammoniaHydrogenFractionByMass)) * fixedDeltaTime / _nitrogenDensity;
             var maxHydrogenMassRate = (_currentMassRate * GameConstants.ammoniaHydrogenFractionByMass) * fixedDeltaTime / _hydrogenDensity;
@@ -74,12 +74,12 @@ namespace FNPlugin.Refinery.Activity
             }
             else
             {
-                _ammoniaConsumptionMassRate = _part.RequestResource(_ammoniaResourceName, _currentMassRate * fixedDeltaTime / _ammoniaDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _ammoniaDensity;
+                _ammoniaConsumptionMassRate = _resources.RequestResource(_ammoniaResourceName, _currentMassRate * fixedDeltaTime / _ammoniaDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _ammoniaDensity;
                 var hydrogenMassRate = _ammoniaConsumptionMassRate * GameConstants.ammoniaHydrogenFractionByMass;
                 var nitrogenMassRate = _ammoniaConsumptionMassRate * (1 - GameConstants.ammoniaHydrogenFractionByMass);
 
-                _hydrogenProductionMassRate = -_part.RequestResource(_hydrogenResourceName, -hydrogenMassRate * fixedDeltaTime / _hydrogenDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _hydrogenDensity;
-                _nitrogenProductionMassRate = -_part.RequestResource(_nitrogenResourceName, -nitrogenMassRate * fixedDeltaTime / _nitrogenDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _nitrogenDensity;
+                _hydrogenProductionMassRate = -_resources.RequestResource(_hydrogenResourceName, -hydrogenMassRate * fixedDeltaTime / _hydrogenDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _hydrogenDensity;
+                _nitrogenProductionMassRate = -_resources.RequestResource(_nitrogenResourceName, -nitrogenMassRate * fixedDeltaTime / _nitrogenDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _nitrogenDensity;
             }
 
             UpdateStatusMessage();
@@ -106,7 +106,7 @@ namespace FNPlugin.Refinery.Activity
             GUILayout.Label((_nitrogenProductionMassRate * GameConstants.SECONDS_IN_HOUR).ToString("0.000") + " mT/" + Localizer.Format("#LOC_KSPIE_AmmoniaElectrolyzer_perhour"), _value_label, GUILayout.Width(valueWidth));//hour
             GUILayout.EndHorizontal();
 
-            var spareCapacityNitrogen = _part.GetResourceSpareCapacity(_nitrogenResourceName);
+            var spareCapacityNitrogen = _resources.GetResourceSpareCapacity(_nitrogenResourceName);
 
             GUILayout.BeginHorizontal();
             GUILayout.Label(Localizer.Format("#LOC_KSPIE_AmmoniaElectrolyzer_SpareCapacityNitrogen"), _bold_label, GUILayout.Width(labelWidth));//"Spare Capacity Nitrogen"

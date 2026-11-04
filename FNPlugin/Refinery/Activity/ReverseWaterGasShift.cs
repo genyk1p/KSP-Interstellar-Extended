@@ -59,8 +59,8 @@ namespace FNPlugin.Refinery.Activity
             if (_waterResourceName == null || _monoxideResourceName == null || _dioxideResourceName == null || _hydrogenResourceName == null)
                 return false;
 
-            return _part.GetConnectedResources(_dioxideResourceName).Any(rs => rs.amount > 0) &&
-                   _part.GetConnectedResources(_hydrogenResourceName).Any(rs => rs.amount > 0);
+            return _resources.GetConnectedResources(_dioxideResourceName).Any(rs => rs.amount > 0) &&
+                   _resources.GetConnectedResources(_hydrogenResourceName).Any(rs => rs.amount > 0);
         }
 
         public override void Initialize(Part localPart, InterstellarRefineryController controller)
@@ -87,10 +87,10 @@ namespace FNPlugin.Refinery.Activity
             _current_rate = CurrentPower / EnergyPerTon;
 
             // determine how much resource we have
-            var partsThatContainWater = _part.GetConnectedResources(_waterResourceName).ToList();
-            var partsThatContainMonoxide = _part.GetConnectedResources(_monoxideResourceName).ToList();
-            var partsThatContainHydrogen = _part.GetConnectedResources(_hydrogenResourceName).ToList();
-            var partsThatContainDioxide = _part.GetConnectedResources(_dioxideResourceName).ToList();
+            var partsThatContainWater = _resources.GetConnectedResources(_waterResourceName).ToList();
+            var partsThatContainMonoxide = _resources.GetConnectedResources(_monoxideResourceName).ToList();
+            var partsThatContainHydrogen = _resources.GetConnectedResources(_hydrogenResourceName).ToList();
+            var partsThatContainDioxide = _resources.GetConnectedResources(_dioxideResourceName).ToList();
 
             _maxCapacityWaterMass = partsThatContainWater.Sum(p => p.maxAmount) * _waterDensity;
             _maxCapacityDioxideMass = partsThatContainDioxide.Sum(p => p.maxAmount) * _dioxideDensity;
@@ -125,15 +125,15 @@ namespace FNPlugin.Refinery.Activity
                 _consumptionStorageRatio = Math.Min(fixedMaxPossibleMonoxideRate / fixedMaxMonoxideRate, fixedMaxPossibleWaterRate / fixedMaxWaterRate);
 
                 // now we do the real consumption
-                _dioxideConsumptionRate = _part.RequestResource(_dioxideResourceName, DioxideMassByFraction * _consumptionStorageRatio * _fixedConsumptionRate / _dioxideDensity) / fixedDeltaTime * _dioxideDensity;
-                _hydrogenConsumptionRate = _part.RequestResource(_hydrogenResourceName, HydrogenMassByFraction * _consumptionStorageRatio * _fixedConsumptionRate / _hydrogenDensity) / fixedDeltaTime * _hydrogenDensity;
+                _dioxideConsumptionRate = _resources.RequestResource(_dioxideResourceName, DioxideMassByFraction * _consumptionStorageRatio * _fixedConsumptionRate / _dioxideDensity) / fixedDeltaTime * _dioxideDensity;
+                _hydrogenConsumptionRate = _resources.RequestResource(_hydrogenResourceName, HydrogenMassByFraction * _consumptionStorageRatio * _fixedConsumptionRate / _hydrogenDensity) / fixedDeltaTime * _hydrogenDensity;
                 var combinedConsumptionRate = _dioxideConsumptionRate + _hydrogenConsumptionRate;
 
                 var monoxideRateTemp = combinedConsumptionRate * MonoxideMassByFraction;
                 var waterRateTemp = combinedConsumptionRate * WaterMassByFraction;
 
-                _monoxideProductionRate = -_part.RequestResource(_monoxideResourceName, -monoxideRateTemp * fixedDeltaTime / _monoxideDensity) / fixedDeltaTime * _monoxideDensity;
-                _waterProductionRate = -_part.RequestResource(_waterResourceName, -waterRateTemp * fixedDeltaTime / _waterDensity) / fixedDeltaTime * _waterDensity;
+                _monoxideProductionRate = -_resources.RequestResource(_monoxideResourceName, -monoxideRateTemp * fixedDeltaTime / _monoxideDensity) / fixedDeltaTime * _monoxideDensity;
+                _waterProductionRate = -_resources.RequestResource(_waterResourceName, -waterRateTemp * fixedDeltaTime / _waterDensity) / fixedDeltaTime * _waterDensity;
             }
             else
             {
@@ -224,9 +224,9 @@ namespace FNPlugin.Refinery.Activity
 
         public override void PrintMissingResources()
         {
-            if (!_part.GetConnectedResources(ResourceSettings.Config.CarbonDioxideLqd).Any(rs => rs.amount > 0))
+            if (!_resources.GetConnectedResources(ResourceSettings.Config.CarbonDioxideLqd).Any(rs => rs.amount > 0))
                 ScreenMessages.PostScreenMessage(Localizer.Format("#LOC_KSPIE_ReverseWaterGasShift_Postmsg") + " " + ResourceSettings.Config.CarbonDioxideLqd, 3.0f, ScreenMessageStyle.UPPER_CENTER);//Missing
-            if (!_part.GetConnectedResources(ResourceSettings.Config.HydrogenLqd).Any(rs => rs.amount > 0))
+            if (!_resources.GetConnectedResources(ResourceSettings.Config.HydrogenLqd).Any(rs => rs.amount > 0))
                 ScreenMessages.PostScreenMessage(Localizer.Format("#LOC_KSPIE_ReverseWaterGasShift_Postmsg") + " " + ResourceSettings.Config.HydrogenLqd, 3.0f, ScreenMessageStyle.UPPER_CENTER);//Missing
         }
     }

@@ -89,11 +89,18 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Animate\FNLightSwitch.cs" />
+    <Compile Include="Background\BackgroundBeams.cs" />
+    <Compile Include="Background\BackgroundConsumers.cs" />
     <Compile Include="Background\BackgroundSnapshot.cs" />
     <Compile Include="Background\Core\BackgroundSpecs.cs" />
+    <Compile Include="Background\Core\BeamReception.cs" />
+    <Compile Include="Background\Core\BeamRules.cs" />
     <Compile Include="Background\Core\CryostatRule.cs" />
     <Compile Include="Background\Core\ElectricDemand.cs" />
+    <Compile Include="Background\Core\PowerAllocation.cs" />
+    <Compile Include="Background\Core\ResourceLedger.cs" />
     <Compile Include="Background\Core\SteadyStateSolver.cs" />
+    <Compile Include="Background\Core\StepPlan.cs" />
     <Compile Include="Background\InterstellarBackgroundPower.cs" />
     <Compile Include="Beamedpower\BeamedPowerTransmitterTag.cs" />
     <Compile Include="Beamedpower\InterstellarBeamedPowerHelper.cs" />
@@ -172,6 +179,7 @@
     <Compile Include="Resources\AntimatterFactory.cs" />
     <Compile Include="Refinery\Activity\AtmosphereProcessor.cs" />
     <Compile Include="Refinery\RefineryActivity.cs" />
+    <Compile Include="Refinery\RefineryResources.cs" />
     <Compile Include="Refinery\Activity\PartialMethaneOxidation.cs" />
     <Compile Include="Powermanagement\InterstellarPowerSupply.cs" />
     <Compile Include="Refinery\Activity\RegolithProcessor.cs" />

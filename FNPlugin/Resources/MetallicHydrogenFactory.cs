@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using FNPlugin.Powermanagement;
 using KSP.Localization;
@@ -89,8 +90,52 @@ namespace FNPlugin.Resources
             }
         }
 
+        // background (Background/BackgroundConsumers, todo/kspie-rails-warp.md A2): values kept from load until the
+        // factory has run in this flight
+        private ConfigNode _loadedBackgroundValues;
+        private bool _backgroundReady;
+        private bool _backgroundErrorLogged;
+
+        public override void OnLoad(ConfigNode node)
+        {
+            base.OnLoad(node);
+            _loadedBackgroundValues = Background.BackgroundSnapshot.CopyBackgroundValues(node);
+        }
+
+        public override void OnSave(ConfigNode node)
+        {
+            base.OnSave(node);
+            if (HighLogic.LoadedSceneIsFlight)
+                Background.BackgroundSnapshot.Save(this, node, _backgroundReady, _loadedBackgroundValues, SaveBackgroundValues, ref _backgroundErrorLogged);
+        }
+
+        /// <summary>
+        /// Power at the slider, hydrogen in and metallic hydrogen out per second (FixedUpdate and Produce); all but
+        /// the efficiency of the power becomes waste heat.
+        /// </summary>
+        private void SaveBackgroundValues(ConfigNode node)
+        {
+            var demand = powerPercentage * 0.01 * powerCapacity * powerRequirementMultiplier;
+            var inputs = new List<KeyValuePair<string, double>>();
+            var outputs = new List<KeyValuePair<string, double>>();
+            if (_liquidHydrogenDefinition != null && _metallicHydrogenDefinition != null && powerRequirementMultiplier > 0
+                && _liquidHydrogenDefinition.density > 0 && _metallicHydrogenDefinition.density > 0)
+            {
+                var tonsPerSecond = demand * efficiency / 1000 / 216 / powerRequirementMultiplier;
+                inputs.Add(new KeyValuePair<string, double>(_liquidHydrogenDefinition.name, tonsPerSecond / _liquidHydrogenDefinition.density));
+                outputs.Add(new KeyValuePair<string, double>(_metallicHydrogenDefinition.name, tonsPerSecond / _metallicHydrogenDefinition.density));
+            }
+            // megajoules only, no ElectricCharge (FixedUpdate: ConsumeFnResourcePerSecond)
+            // FixedUpdate asks for powerPercentage × min(powerCapacity × multiplier, stable supply)
+            Background.BackgroundConsumers.WriteRecipe(node, isActive && outputs.Count > 0, demand, getPowerPriority(),
+                Math.Max(0, Math.Min(1, 1 - efficiency)), 0, false, inputs, outputs, nameof(lastActiveTime), powerPercentage * 0.01);
+        }
+
         public void FixedUpdate()
         {
+            if (HighLogic.LoadedSceneIsFlight)
+                _backgroundReady = true;
+
             if (!isActive)
                 return;
 

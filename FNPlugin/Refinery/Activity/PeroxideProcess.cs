@@ -60,8 +60,8 @@ namespace FNPlugin.Refinery.Activity
             if (_hydrogenPeroxideName == null || _ammoniaResourceName == null)
                 return false;
 
-            return _part.GetConnectedResources(_hydrogenPeroxideName).Any(rs => rs.amount > 0)
-            & _part.GetConnectedResources(_ammoniaResourceName).Any(rs => rs.amount > 0);
+            return _resources.GetConnectedResources(_hydrogenPeroxideName).Any(rs => rs.amount > 0)
+            & _resources.GetConnectedResources(_ammoniaResourceName).Any(rs => rs.amount > 0);
         }
 
         public override void Initialize(Part localPart, InterstellarRefineryController controller)
@@ -86,10 +86,10 @@ namespace FNPlugin.Refinery.Activity
             _current_rate = CurrentPower / EnergyPerTon;
 
             // determine how much resource we have
-            var partsThatContainAmmonia = _part.GetConnectedResources(_ammoniaResourceName).ToList();
-            var partsThatContainHydrogenPeroxide = _part.GetConnectedResources(_hydrogenPeroxideName).ToList();
-            var partsThatContainHydrazine = _part.GetConnectedResources(_hydrazineResourceName).ToList();
-            var partsThatContainWater = _part.GetConnectedResources(_waterResourceName).ToList();
+            var partsThatContainAmmonia = _resources.GetConnectedResources(_ammoniaResourceName).ToList();
+            var partsThatContainHydrogenPeroxide = _resources.GetConnectedResources(_hydrogenPeroxideName).ToList();
+            var partsThatContainHydrazine = _resources.GetConnectedResources(_hydrazineResourceName).ToList();
+            var partsThatContainWater = _resources.GetConnectedResources(_waterResourceName).ToList();
 
             _maxCapacityAmmoniaMass = partsThatContainAmmonia.Sum(p => p.maxAmount) * _ammoniaDensity;
             _maxCapacityHydrogenPeroxideMass = partsThatContainHydrogenPeroxide.Sum(p => p.maxAmount) * _hydrogenPeroxideDensity;
@@ -125,18 +125,18 @@ namespace FNPlugin.Refinery.Activity
 
                 // now we do the real consumption
                 var ammoniaRequest = _fixedConsumptionRate * AmmoniaMassConsumptionRatio * _consumptionStorageRatio / _ammoniaDensity;
-                _ammoniaConsumptionRate = _part.RequestResource(_ammoniaResourceName, ammoniaRequest) * _ammoniaDensity / fixedDeltaTime;
+                _ammoniaConsumptionRate = _resources.RequestResource(_ammoniaResourceName, ammoniaRequest) * _ammoniaDensity / fixedDeltaTime;
 
                 var hydrogenPeroxideRequest = _fixedConsumptionRate * HydrogenPeroxideMassConsumptionRatio * _consumptionStorageRatio / _hydrogenPeroxideDensity;
-                _hydrogenPeroxideConsumptionRate = _part.RequestResource(_hydrogenPeroxideName, hydrogenPeroxideRequest) * _hydrogenPeroxideDensity / fixedDeltaTime;
+                _hydrogenPeroxideConsumptionRate = _resources.RequestResource(_hydrogenPeroxideName, hydrogenPeroxideRequest) * _hydrogenPeroxideDensity / fixedDeltaTime;
 
                 var combinedConsumptionRate = _ammoniaConsumptionRate + _hydrogenPeroxideConsumptionRate;
 
                 var fixedHydrazineProduction = combinedConsumptionRate * HydrazineMassProductionRatio * fixedDeltaTime / _hydrazineDensity;
-                    _hydrazineProductionRate = -_part.RequestResource(_hydrazineResourceName, -fixedHydrazineProduction) * _hydrazineDensity / fixedDeltaTime;
+                    _hydrazineProductionRate = -_resources.RequestResource(_hydrazineResourceName, -fixedHydrazineProduction) * _hydrazineDensity / fixedDeltaTime;
 
                 var fixedWaterProduction = combinedConsumptionRate * WaterMassProductionRatio * fixedDeltaTime / _waterDensity;
-                    _waterProductionRate = -_part.RequestResource(_waterResourceName, -fixedWaterProduction) * _waterDensity / fixedDeltaTime;
+                    _waterProductionRate = -_resources.RequestResource(_waterResourceName, -fixedWaterProduction) * _waterDensity / fixedDeltaTime;
             }
             else
             {
@@ -234,9 +234,9 @@ namespace FNPlugin.Refinery.Activity
 
         public override void PrintMissingResources()
         {
-            if (!_part.GetConnectedResources(ResourceSettings.Config.HydrogenPeroxide).Any(rs => rs.amount > 0))
+            if (!_resources.GetConnectedResources(ResourceSettings.Config.HydrogenPeroxide).Any(rs => rs.amount > 0))
                 ScreenMessages.PostScreenMessage(Localizer.Format("#LOC_KSPIE_PeroxideProcess_Postmsg1", ResourceSettings.Config.HydrogenPeroxide), 3.0f, ScreenMessageStyle.UPPER_CENTER);//"Missing " +  + " (Hydrogen Peroxide)"
-            if (!_part.GetConnectedResources(ResourceSettings.Config.AmmoniaLqd).Any(rs => rs.amount > 0))
+            if (!_resources.GetConnectedResources(ResourceSettings.Config.AmmoniaLqd).Any(rs => rs.amount > 0))
                 ScreenMessages.PostScreenMessage(Localizer.Format("#LOC_KSPIE_PeroxideProcess_Postmsg2", ResourceSettings.Config.AmmoniaLqd), 3.0f, ScreenMessageStyle.UPPER_CENTER);//"Missing " +
         }
     }

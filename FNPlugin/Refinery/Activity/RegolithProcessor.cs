@@ -62,7 +62,7 @@ namespace FNPlugin.Refinery.Activity
 
         public override bool HasActivityRequirements()
         {
-            return _part.GetConnectedResources(_strRegolithResourceName).Any(rs => rs.amount > 0);
+            return _resources.GetConnectedResources(_strRegolithResourceName).Any(rs => rs.amount > 0);
         }
 
         protected PartResourceDefinition deuteriumDefinition;
@@ -148,16 +148,16 @@ namespace FNPlugin.Refinery.Activity
             _current_rate = CurrentPower / EnergyPerTon;
 
             // determine how much resource we have
-            var partsThatContainRegolith = _part.GetConnectedResources(_strRegolithResourceName).ToList();
-            var partsThatContainHydrogen = _part.GetConnectedResources(_strHydrogenResourceName).ToList();
-            var partsThatContainDeuterium = _part.GetConnectedResources(_stDeuteriumResourceName).ToList();
-            var partsThatContainLqdHelium3 = _part.GetConnectedResources(_strLiquidHelium3ResourceName).ToList();
-            var partsThatContainLqdHelium4 = _part.GetConnectedResources(_strLiquidHelium4ResourceName).ToList();
-            var partsThatContainMonoxide = _part.GetConnectedResources(_strMonoxideResourceName).ToList();
-            var partsThatContainDioxide = _part.GetConnectedResources(_strDioxideResourceName).ToList(); ;
-            var partsThatContainMethane = _part.GetConnectedResources(_strMethaneResourceName).ToList();
-            var partsThatContainNitrogen = _part.GetConnectedResources(_strNitrogenResourceName).ToList();
-            var partsThatContainWater = _part.GetConnectedResources(_strWaterResourceName).ToList();
+            var partsThatContainRegolith = _resources.GetConnectedResources(_strRegolithResourceName).ToList();
+            var partsThatContainHydrogen = _resources.GetConnectedResources(_strHydrogenResourceName).ToList();
+            var partsThatContainDeuterium = _resources.GetConnectedResources(_stDeuteriumResourceName).ToList();
+            var partsThatContainLqdHelium3 = _resources.GetConnectedResources(_strLiquidHelium3ResourceName).ToList();
+            var partsThatContainLqdHelium4 = _resources.GetConnectedResources(_strLiquidHelium4ResourceName).ToList();
+            var partsThatContainMonoxide = _resources.GetConnectedResources(_strMonoxideResourceName).ToList();
+            var partsThatContainDioxide = _resources.GetConnectedResources(_strDioxideResourceName).ToList(); ;
+            var partsThatContainMethane = _resources.GetConnectedResources(_strMethaneResourceName).ToList();
+            var partsThatContainNitrogen = _resources.GetConnectedResources(_strNitrogenResourceName).ToList();
+            var partsThatContainWater = _resources.GetConnectedResources(_strWaterResourceName).ToList();
 
             // determine the maximum amount of a resource the vessel can hold (ie. tank capacities combined)
             dMaxCapacityRegolithMass = partsThatContainRegolith.Sum(p => p.maxAmount) * _dRegolithDensity;
@@ -244,7 +244,7 @@ namespace FNPlugin.Refinery.Activity
                 _dConsumptionStorageRatio =  allowOverflow ? ratios.Max(m => m) : ratios.Min(m => m);
 
                 // this consumes the resource
-                var fixedCollectedRegolith = _part.RequestResource(_strRegolithResourceName, _dConsumptionStorageRatio * _dFixedConsumptionRate / _dRegolithDensity, ResourceFlowMode.STACK_PRIORITY_SEARCH) * _dRegolithDensity;
+                var fixedCollectedRegolith = _resources.RequestResource(_strRegolithResourceName, _dConsumptionStorageRatio * _dFixedConsumptionRate / _dRegolithDensity, ResourceFlowMode.STACK_PRIORITY_SEARCH) * _dRegolithDensity;
 
                 _fixedRegolithConsumptionRate = Math.Max(fixedCollectedRegolith, availableRegolithExtractionMassFixed);
 
@@ -261,15 +261,15 @@ namespace FNPlugin.Refinery.Activity
                 double dNitrogenRateTemp = _fixedRegolithConsumptionRate * dNitrogenMassByFraction;
                 double dWaterRateTemp = _fixedRegolithConsumptionRate * dWaterMassByFraction;
 
-                _dHydrogenProductionRate = -_part.RequestResource(_strHydrogenResourceName, -dHydrogenRateTemp  / _dHydrogenDensity) / fixedDeltaTime * _dHydrogenDensity;
-                _dDeuteriumProductionRate = -_part.RequestResource(_stDeuteriumResourceName, -dDeuteriumRateTemp / _dDeuteriumDensity) / fixedDeltaTime * _dDeuteriumDensity;
-                _dLiquidHelium3ProductionRate = -_part.RequestResource(_strLiquidHelium3ResourceName, -dHelium3RateTemp  / _dLiquidHelium3Density) / fixedDeltaTime * _dLiquidHelium3Density;
-                _dLiquidHelium4ProductionRate = -_part.RequestResource(_strLiquidHelium4ResourceName, -dHelium4RateTemp  / _dLiquidHelium4Density) / fixedDeltaTime * _dLiquidHelium4Density;
-                _dMonoxideProductionRate = -_part.RequestResource(_strMonoxideResourceName, -dMonoxideRateTemp  / _dMonoxideDensity) / fixedDeltaTime * _dMonoxideDensity;
-                _dDioxideProductionRate = -_part.RequestResource(_strDioxideResourceName, -dDioxideRateTemp  / _dDioxideDensity) / fixedDeltaTime * _dDioxideDensity;
-                _dMethaneProductionRate = -_part.RequestResource(_strMethaneResourceName, -dMethaneRateTemp  / _dMethaneDensity) / fixedDeltaTime * _dMethaneDensity;
-                _dNitrogenProductionRate = -_part.RequestResource(_strNitrogenResourceName, -dNitrogenRateTemp  / _dNitrogenDensity) / fixedDeltaTime * _dNitrogenDensity;
-                _dWaterProductionRate = -_part.RequestResource(_strWaterResourceName, -dWaterRateTemp  / _dWaterDensity) / fixedDeltaTime * _dWaterDensity;
+                _dHydrogenProductionRate = -_resources.RequestResource(_strHydrogenResourceName, -dHydrogenRateTemp  / _dHydrogenDensity) / fixedDeltaTime * _dHydrogenDensity;
+                _dDeuteriumProductionRate = -_resources.RequestResource(_stDeuteriumResourceName, -dDeuteriumRateTemp / _dDeuteriumDensity) / fixedDeltaTime * _dDeuteriumDensity;
+                _dLiquidHelium3ProductionRate = -_resources.RequestResource(_strLiquidHelium3ResourceName, -dHelium3RateTemp  / _dLiquidHelium3Density) / fixedDeltaTime * _dLiquidHelium3Density;
+                _dLiquidHelium4ProductionRate = -_resources.RequestResource(_strLiquidHelium4ResourceName, -dHelium4RateTemp  / _dLiquidHelium4Density) / fixedDeltaTime * _dLiquidHelium4Density;
+                _dMonoxideProductionRate = -_resources.RequestResource(_strMonoxideResourceName, -dMonoxideRateTemp  / _dMonoxideDensity) / fixedDeltaTime * _dMonoxideDensity;
+                _dDioxideProductionRate = -_resources.RequestResource(_strDioxideResourceName, -dDioxideRateTemp  / _dDioxideDensity) / fixedDeltaTime * _dDioxideDensity;
+                _dMethaneProductionRate = -_resources.RequestResource(_strMethaneResourceName, -dMethaneRateTemp  / _dMethaneDensity) / fixedDeltaTime * _dMethaneDensity;
+                _dNitrogenProductionRate = -_resources.RequestResource(_strNitrogenResourceName, -dNitrogenRateTemp  / _dNitrogenDensity) / fixedDeltaTime * _dNitrogenDensity;
+                _dWaterProductionRate = -_resources.RequestResource(_strWaterResourceName, -dWaterRateTemp  / _dWaterDensity) / fixedDeltaTime * _dWaterDensity;
             }
             else
             {

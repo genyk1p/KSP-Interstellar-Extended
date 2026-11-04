@@ -79,7 +79,7 @@ namespace FNPlugin.Refinery.Activity
 
         public override bool HasActivityRequirements ()
         {
-           return _part.GetConnectedResources(_solarWindResourceName).Any(rs => rs.maxAmount > 0);
+           return _resources.GetConnectedResources(_solarWindResourceName).Any(rs => rs.maxAmount > 0);
         }
 
         public override void Initialize(Part localPart, InterstellarRefineryController controller)
@@ -165,22 +165,22 @@ namespace FNPlugin.Refinery.Activity
             _current_rate = CurrentPower / EnergyPerTon;
 
             // determine how much resource we have
-            var partsThatContainSolarWind = _part.GetConnectedResources(_solarWindResourceName).ToList();
+            var partsThatContainSolarWind = _resources.GetConnectedResources(_solarWindResourceName).ToList();
 
-            var partsThatContainHydrogenLiquid = _part.GetConnectedResources(_hydrogenLiquidResourceName).ToList();
-            var partsThatContainHydrogenGas = _part.GetConnectedResources(_hydrogenGasResourceName).ToList();
-            var partsThatContainDeuteriumLiquid = _part.GetConnectedResources(_deuteriumLiquidResourceName).ToList();
-            var partsThatContainDeuteriumGas = _part.GetConnectedResources(_deuteriumGasResourceName).ToList();
-            var partsThatContainLqdHelium3Liquid = _part.GetConnectedResources(_helium3LiquidResourceName).ToList();
-            var partsThatContainLqdHelium3Gas = _part.GetConnectedResources(_helium3GasResourceName).ToList();
-            var partsThatContainLqdHelium4Liquid = _part.GetConnectedResources(_helium4LiquidResourceName).ToList();
-            var partsThatContainLqdHelium4Gas = _part.GetConnectedResources(_helium4GasResourceName).ToList();
-            var partsThatContainMonoxideLiquid = _part.GetConnectedResources(_monoxideLiquidResourceName).ToList();
-            var partsThatContainMonoxideGas = _part.GetConnectedResources(_monoxideGasResourceName).ToList();
-            var partsThatContainNitrogenLiquid = _part.GetConnectedResources(_nitrogenLiquidResourceName).ToList();
-            var partsThatContainNitrogenGas = _part.GetConnectedResources(_nitrogenGasResourceName).ToList();
-            var partsThatContainNeonLiquid = _part.GetConnectedResources(_neonLiquidResourceName).ToList();
-            var partsThatContainNeonGas = _part.GetConnectedResources(_neonGasResourceName).ToList();
+            var partsThatContainHydrogenLiquid = _resources.GetConnectedResources(_hydrogenLiquidResourceName).ToList();
+            var partsThatContainHydrogenGas = _resources.GetConnectedResources(_hydrogenGasResourceName).ToList();
+            var partsThatContainDeuteriumLiquid = _resources.GetConnectedResources(_deuteriumLiquidResourceName).ToList();
+            var partsThatContainDeuteriumGas = _resources.GetConnectedResources(_deuteriumGasResourceName).ToList();
+            var partsThatContainLqdHelium3Liquid = _resources.GetConnectedResources(_helium3LiquidResourceName).ToList();
+            var partsThatContainLqdHelium3Gas = _resources.GetConnectedResources(_helium3GasResourceName).ToList();
+            var partsThatContainLqdHelium4Liquid = _resources.GetConnectedResources(_helium4LiquidResourceName).ToList();
+            var partsThatContainLqdHelium4Gas = _resources.GetConnectedResources(_helium4GasResourceName).ToList();
+            var partsThatContainMonoxideLiquid = _resources.GetConnectedResources(_monoxideLiquidResourceName).ToList();
+            var partsThatContainMonoxideGas = _resources.GetConnectedResources(_monoxideGasResourceName).ToList();
+            var partsThatContainNitrogenLiquid = _resources.GetConnectedResources(_nitrogenLiquidResourceName).ToList();
+            var partsThatContainNitrogenGas = _resources.GetConnectedResources(_nitrogenGasResourceName).ToList();
+            var partsThatContainNeonLiquid = _resources.GetConnectedResources(_neonLiquidResourceName).ToList();
+            var partsThatContainNeonGas = _resources.GetConnectedResources(_neonGasResourceName).ToList();
 
             // determine the maximum amount of a resource the vessel can hold (ie. tank capacities combined)
             _maxCapacitySolarWindMass = partsThatContainSolarWind.Sum(p => p.maxAmount) * _solarWindDensity;
@@ -255,7 +255,7 @@ namespace FNPlugin.Refinery.Activity
                 double minConsumptionStorageRatio = consumptionStorageRatios.Min();
 
                 // this consumes the resource
-                _solarWindConsumptionRate = _part.RequestResource(_solarWindResourceName, minConsumptionStorageRatio * _fixedConsumptionRate / _solarWindDensity) / fixedDeltaTime * _solarWindDensity;
+                _solarWindConsumptionRate = _resources.RequestResource(_solarWindResourceName, minConsumptionStorageRatio * _fixedConsumptionRate / _solarWindDensity) / fixedDeltaTime * _solarWindDensity;
 
                 // this produces the products
                 var hydrogenRateTemp = _solarWindConsumptionRate * _hydrogenMassByFraction;
@@ -266,26 +266,26 @@ namespace FNPlugin.Refinery.Activity
                 var nitrogenRateTemp = _solarWindConsumptionRate * _nitrogenMassByFraction;
                 var neonRateTemp = _solarWindConsumptionRate * _neonMassByFraction;
 
-                _hydrogenProductionRate = -_part.RequestResource(_hydrogenGasResourceName, -hydrogenRateTemp * fixedDeltaTime / _hydrogenGasDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _hydrogenGasDensity;
-                _hydrogenProductionRate += -_part.RequestResource(_hydrogenLiquidResourceName, -(hydrogenRateTemp - _hydrogenProductionRate) * fixedDeltaTime / _hydrogenLiquidDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _hydrogenLiquidDensity;
+                _hydrogenProductionRate = -_resources.RequestResource(_hydrogenGasResourceName, -hydrogenRateTemp * fixedDeltaTime / _hydrogenGasDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _hydrogenGasDensity;
+                _hydrogenProductionRate += -_resources.RequestResource(_hydrogenLiquidResourceName, -(hydrogenRateTemp - _hydrogenProductionRate) * fixedDeltaTime / _hydrogenLiquidDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _hydrogenLiquidDensity;
 
-                _deuteriumProductionRate = -_part.RequestResource(_deuteriumGasResourceName, -deuteriumRateTemp * fixedDeltaTime / _deuteriumGasDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _deuteriumGasDensity;
-                _deuteriumProductionRate += -_part.RequestResource(_deuteriumLiquidResourceName, -(deuteriumRateTemp - _deuteriumProductionRate) * fixedDeltaTime / _deuteriumLiquidDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _deuteriumLiquidDensity;
+                _deuteriumProductionRate = -_resources.RequestResource(_deuteriumGasResourceName, -deuteriumRateTemp * fixedDeltaTime / _deuteriumGasDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _deuteriumGasDensity;
+                _deuteriumProductionRate += -_resources.RequestResource(_deuteriumLiquidResourceName, -(deuteriumRateTemp - _deuteriumProductionRate) * fixedDeltaTime / _deuteriumLiquidDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _deuteriumLiquidDensity;
 
-                _liquidHelium3ProductionRate = -_part.RequestResource(_helium3GasResourceName, -helium3RateTemp * fixedDeltaTime / _liquidHelium3GasDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _liquidHelium3GasDensity;
-                _liquidHelium3ProductionRate += -_part.RequestResource(_helium3LiquidResourceName, -(helium3RateTemp - _liquidHelium3ProductionRate) * fixedDeltaTime / _liquidHelium3LiquidDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _liquidHelium3LiquidDensity;
+                _liquidHelium3ProductionRate = -_resources.RequestResource(_helium3GasResourceName, -helium3RateTemp * fixedDeltaTime / _liquidHelium3GasDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _liquidHelium3GasDensity;
+                _liquidHelium3ProductionRate += -_resources.RequestResource(_helium3LiquidResourceName, -(helium3RateTemp - _liquidHelium3ProductionRate) * fixedDeltaTime / _liquidHelium3LiquidDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _liquidHelium3LiquidDensity;
 
-                _liquidHelium4ProductionRate = -_part.RequestResource(_helium4GasResourceName, -helium4RateTemp * fixedDeltaTime / _liquidHelium4GasDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _liquidHelium4GasDensity;
-                _liquidHelium4ProductionRate += -_part.RequestResource(_helium4LiquidResourceName, -(helium4RateTemp - _liquidHelium4ProductionRate) * fixedDeltaTime / _liquidHelium4LiquidDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _liquidHelium4LiquidDensity;
+                _liquidHelium4ProductionRate = -_resources.RequestResource(_helium4GasResourceName, -helium4RateTemp * fixedDeltaTime / _liquidHelium4GasDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _liquidHelium4GasDensity;
+                _liquidHelium4ProductionRate += -_resources.RequestResource(_helium4LiquidResourceName, -(helium4RateTemp - _liquidHelium4ProductionRate) * fixedDeltaTime / _liquidHelium4LiquidDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _liquidHelium4LiquidDensity;
 
-                _monoxideProductionRate = -_part.RequestResource(_monoxideGasResourceName, -monoxideRateTemp * fixedDeltaTime / _monoxideGasDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _monoxideGasDensity;
-                _monoxideProductionRate += -_part.RequestResource(_monoxideLiquidResourceName, -(monoxideRateTemp - _monoxideProductionRate) * fixedDeltaTime / _monoxideLiquidDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _monoxideLiquidDensity;
+                _monoxideProductionRate = -_resources.RequestResource(_monoxideGasResourceName, -monoxideRateTemp * fixedDeltaTime / _monoxideGasDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _monoxideGasDensity;
+                _monoxideProductionRate += -_resources.RequestResource(_monoxideLiquidResourceName, -(monoxideRateTemp - _monoxideProductionRate) * fixedDeltaTime / _monoxideLiquidDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _monoxideLiquidDensity;
 
-                _nitrogenProductionRate = -_part.RequestResource(_nitrogenGasResourceName, -nitrogenRateTemp * fixedDeltaTime / _nitrogenGasDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _nitrogenGasDensity;
-                _nitrogenProductionRate += -_part.RequestResource(_nitrogenLiquidResourceName, -(nitrogenRateTemp - _nitrogenProductionRate) * fixedDeltaTime / _nitrogenLiquidDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _nitrogenLiquidDensity;
+                _nitrogenProductionRate = -_resources.RequestResource(_nitrogenGasResourceName, -nitrogenRateTemp * fixedDeltaTime / _nitrogenGasDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _nitrogenGasDensity;
+                _nitrogenProductionRate += -_resources.RequestResource(_nitrogenLiquidResourceName, -(nitrogenRateTemp - _nitrogenProductionRate) * fixedDeltaTime / _nitrogenLiquidDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _nitrogenLiquidDensity;
 
-                _neonProductionRate = -_part.RequestResource(_neonGasResourceName, -neonRateTemp * fixedDeltaTime / _neonGasDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _neonGasDensity;
-                _neonProductionRate += -_part.RequestResource(_neonLiquidResourceName, -(neonRateTemp - _neonProductionRate) * fixedDeltaTime / _neonLiquidDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _neonLiquidDensity;
+                _neonProductionRate = -_resources.RequestResource(_neonGasResourceName, -neonRateTemp * fixedDeltaTime / _neonGasDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _neonGasDensity;
+                _neonProductionRate += -_resources.RequestResource(_neonLiquidResourceName, -(neonRateTemp - _neonProductionRate) * fixedDeltaTime / _neonLiquidDensity, ResourceFlowMode.ALL_VESSEL) / fixedDeltaTime * _neonLiquidDensity;
             }
             else
             {

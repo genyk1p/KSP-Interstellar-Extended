@@ -3,6 +3,7 @@ using FNPlugin.Extensions;
 using FNPlugin.Powermanagement;
 using KSP.Localization;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
@@ -148,7 +149,8 @@ namespace FNPlugin.Resources
             if (IsCollectLegal() == false) return;
 
             // calculate time difference since last time the vessel was active
-            double dTimeDifference = (Planetarium.GetUniversalTime() - dLastActiveTime) * 55;
+            // fork: upstream multiplied the time by 55 (55 times the loaded rate while away)
+            double dTimeDifference = Planetarium.GetUniversalTime() - dLastActiveTime;
 
             //bTouchDown = this.part.GroundContact; // is the drill touching the ground?
 
@@ -180,9 +182,49 @@ namespace FNPlugin.Resources
             strAltitude = (vessel.altitude < 15000) ? (vessel.altitude).ToString("F0") : Localizer.Format("#LOC_KSPIE_RegolithCollector_Altitudetoohigh");//"Too damn high"
         }
 
+        // background (Background/BackgroundConsumers, todo/kspie-rails-warp.md A2): values kept from load until the
+        // collector has run in this flight
+        private ConfigNode _loadedBackgroundValues;
+        private bool _backgroundReady;
+        private bool _backgroundErrorLogged;
+
+        public override void OnLoad(ConfigNode node)
+        {
+            base.OnLoad(node);
+            _loadedBackgroundValues = Background.BackgroundSnapshot.CopyBackgroundValues(node);
+        }
+
+        public override void OnSave(ConfigNode node)
+        {
+            base.OnSave(node);
+            if (HighLogic.LoadedSceneIsFlight)
+                Background.BackgroundSnapshot.Save(this, node, _backgroundReady, _loadedBackgroundValues, SaveBackgroundValues, ref _backgroundErrorLogged);
+        }
+
+        /// <summary>
+        /// Regolith collected per second at full power where the vessel stands (CollectRegolith): the background step
+        /// scales it by the power the vessel gives the collector.
+        /// </summary>
+        private void SaveBackgroundValues(ConfigNode node)
+        {
+            var outputs = new List<KeyValuePair<string, double>>();
+            var active = bIsEnabled && localStar != null && IsCollectLegal() && TryRaycastToHitTerrain();
+            if (active)
+            {
+                var perSecond = GetFinalConcentration() * drillSize * dRegolithDensity * effectiveness;
+                if (perSecond > 0 && !double.IsInfinity(perSecond))
+                    outputs.Add(new KeyValuePair<string, double>(strRegolithResourceName, perSecond));
+            }
+            var demand = PluginSettings.Config.PowerConsumptionMultiplier * mwRequirements;
+            // CollectRegolith: ElectricCharge for the shortage only under 2 MW
+            Background.BackgroundConsumers.WriteRecipe(node, active && outputs.Count > 0, demand, getPowerPriority(), wasteHeatModifier, 0,
+                demand < 2.0, null, outputs, nameof(dLastActiveTime));
+        }
+
         public override void OnFixedUpdate()
         {
             if (FlightGlobals.fetch == null) return;
+            _backgroundReady = true;
 
             if (!bIsEnabled)
             {

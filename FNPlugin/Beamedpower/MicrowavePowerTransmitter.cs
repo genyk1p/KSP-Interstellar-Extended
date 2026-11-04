@@ -277,6 +277,50 @@ namespace FNPlugin.Beamedpower
             DeactivateRelay();
         }
 
+        // background (Background/BackgroundConsumers, todo/kspie-rails-warp.md A3): values kept from load until the
+        // transmitter has run in this flight
+        private ConfigNode _loadedBackgroundValues;
+        private bool _backgroundReady;
+        private bool _backgroundErrorLogged;
+
+        public override void OnLoad(ConfigNode node)
+        {
+            base.OnLoad(node);
+            _loadedBackgroundValues = Background.BackgroundSnapshot.CopyBackgroundValues(node);
+        }
+
+        public override void OnSave(ConfigNode node)
+        {
+            base.OnSave(node);
+            if (HighLogic.LoadedSceneIsFlight)
+                Background.BackgroundSnapshot.Save(this, node, _backgroundReady, _loadedBackgroundValues, SaveBackgroundValues, ref _backgroundErrorLogged);
+        }
+
+        /// <summary>
+        /// What the background step needs to run the transmitter as a consumer of its vessel's power (FixedUpdate):
+        /// power at the transmission slider, the beam generator's efficiency before wear and its wear parameters, and
+        /// where the generator's own node is (its wear is kept there).
+        /// </summary>
+        private void SaveBackgroundValues(ConfigNode node)
+        {
+            var generator = activeBeamGenerator;
+            var active = IsEnabled && !relay && generator != null && generator.isEnabled && power_capacity > 0;
+            node.SetValue(Background.BackgroundConsumers.ConsumerMarker, Background.BackgroundConsumers.TransmitterKind, true);
+            node.SetValue(Background.BackgroundSnapshot.Active, active.ToString(), true);
+            node.SetValue(Background.BackgroundConsumers.DemandMW, Background.BackgroundSnapshot.Number(power_capacity * (double)(decimal)transmitPower / 100d), true);
+            // FixedUpdate asks for min(power_capacity, stable supply) × slider
+            node.SetValue(Background.BackgroundConsumers.PlantSlider, Background.BackgroundSnapshot.Number((double)(decimal)transmitPower / 100d), true);
+            node.SetValue(Background.BackgroundConsumers.Priority, getPowerPriority().ToString(System.Globalization.CultureInfo.InvariantCulture), true);
+            if (generator == null) return;
+            node.SetValue(Background.BackgroundConsumers.BeamEfficiency, Background.BackgroundSnapshot.Number(generator.BaseEfficiencyPercentage / 100), true);
+            node.SetValue(Background.BackgroundConsumers.GeneratorPart, generator.part.flightID.ToString(System.Globalization.CultureInfo.InvariantCulture), true);
+            node.SetValue(Background.BackgroundConsumers.GeneratorModule, generator.moduleName, true);
+            node.SetValue(Background.BackgroundConsumers.WearLifeHours, Background.BackgroundSnapshot.Number(generator.WearEnabled ? generator.EffectiveLifetimeHours : 0), true);
+            node.SetValue(Background.BackgroundConsumers.WearEndLoss, Background.BackgroundSnapshot.Number(generator.endOfLifeLoss), true);
+            node.SetValue(Background.BackgroundConsumers.WearMaxLoss, Background.BackgroundSnapshot.Number(generator.maxWearLoss), true);
+            node.SetValue(Background.BackgroundConsumers.WearHeatDoublings, Background.BackgroundSnapshot.Number(generator.heatWearDoublings), true);
+        }
+
         public override void OnStart(StartState state)
         {
             onMoving = new EventData<float, float>("transmitterMoving");
@@ -512,6 +556,8 @@ namespace FNPlugin.Beamedpower
                 transmissionEfficiencyPercentage = activeBeamGenerator.efficiencyPercentage;
 
             if (!HighLogic.LoadedSceneIsFlight) return;
+
+            _backgroundReady = true;
 
             nuclear_power = 0;
             solar_power = 0;

@@ -14,7 +14,10 @@ namespace FNPlugin.Background
     ///
     /// A reactor is either run by the model completely, or left completely to its own catch-up on load
     /// (InterstellarReactor.DoPersistentResourceUpdate): a reactor whose power also goes to something the model does
-    /// not run (beamed power, an MHD generator, an engine) is left out, so that its fuel is still billed on load.
+    /// not run (an MHD generator, an engine, a beamed power transmitter saved before step A3) is left out, so that its
+    /// fuel is still billed on load. When the vessel's power is not known completely (<see cref="VesselReading.PowerIncomplete"/>)
+    /// and it has KSPIE consumers, InterstellarBackgroundPower leaves the whole plant to its catch-up
+    /// (<see cref="VesselReading.LeaveAllToCatchUp"/>).
     /// </summary>
     public static class BackgroundSnapshot
     {
@@ -27,6 +30,10 @@ namespace FNPlugin.Background
         public const string RadiatorMarker = "bgRadiator";
 
         public const string Active = "bgActive";
+        /// <summary>Writing the module's values failed (the exception is the value): the model does not know what it does.</summary>
+        public const string SaveError = "bgSaveError";
+        /// <summary>A reactor that runs but that the model cannot run (fusion plasma upkeep, no fuel mode): its power is unknown.</summary>
+        public const string PowerUnknown = "bgPowerUnknown";
 
         public const string ThermalMW = "bgThermalMW";
         public const string ChargedMW = "bgChargedMW";
@@ -59,7 +66,8 @@ namespace FNPlugin.Background
         /// <summary>The reactor's own catch-up on load (InterstellarReactor.DoPersistentResourceUpdate) starts from this time.</summary>
         public const string ReactorLastActiveTime = "last_active_time";
 
-        /// <summary>Beamed power transmitter classes (BeamedPowerTransmitter and subclasses): their persistent IsEnabled.</summary>
+        /// <summary>Beamed power transmitter classes (BeamedPowerTransmitter and subclasses): their persistent IsEnabled.
+        /// Since step A3 a transmitter with background values is a consumer (BackgroundConsumers).</summary>
         private static readonly HashSet<string> TransmitterModules = new HashSet<string>
             { "BeamedPowerTransmitter", "MicrowavePowerTransmitter", "PhasedArrayTransmitter", "BeamedPowerLaserTransmitter" };
 
@@ -106,11 +114,13 @@ namespace FNPlugin.Background
                     return;
                 }
                 node.SetValue(Version, CurrentVersion, true);
+                if (node.HasValue(SaveError)) node.RemoveValue(SaveError);
                 write(node);
             }
             catch (Exception e)
             {
                 node.SetValue(Active, "False", true);
+                node.SetValue(SaveError, e.GetType().Name + ": " + e.Message, true);
                 if (errorLogged) return;
                 errorLogged = true;
                 Debug.LogError("[KSPI]: background values not saved for " + module.part?.partInfo?.name + "/" + module.GetType().Name + ": " + e);
@@ -139,8 +149,40 @@ namespace FNPlugin.Background
             public readonly Dictionary<string, double> Capacity = new Dictionary<string, double>();
             /// <summary>Reactors left to their own catch-up, and why (for the log).</summary>
             public readonly List<string> Excluded = new List<string>();
+            /// <summary>
+            /// The vessel may get electric power the model does not run: a reactor with a generator left to its catch-up
+            /// (MHD, Kerbalism process), a reactor that runs but cannot be modelled (fusion), a beamed power receiver the
+            /// model does not run (solar thermal, slave or master, saved before step A3), a generator fed by an unknown
+            /// source, or a module whose values could not be written or read. With KSPIE consumers on board,
+            /// InterstellarBackgroundPower then leaves the whole plant to its catch-up (consumers included).
+            /// </summary>
+            public bool PowerIncomplete;
             /// <summary>Unreadable values (for the log).</summary>
             public readonly List<string> Problems = new List<string>();
+            /// <summary>
+            /// Beamed power receivers the model runs (step A3). A thermal mode one is also a fuel-less pseudo-reactor in
+            /// Spec.Reactors (ReactorIndex; its ReactorNodes entry is null), so that its generators attach to it.
+            /// </summary>
+            public readonly List<BackgroundBeams.Receiver> Receivers = new List<BackgroundBeams.Receiver>();
+
+            /// <summary>
+            /// Leaves every reactor and receiver to its own catch-up on load, as without the model: the vessel's power
+            /// is not known completely and consumers would otherwise run on part of it, or produce on load with power
+            /// nobody paid for.
+            /// </summary>
+            public void LeaveAllToCatchUp(string reason)
+            {
+                foreach (var part in ReactorParts)
+                    Excluded.Add(part.partName + ": " + reason);
+                Spec.Reactors.Clear();
+                Spec.Generators.Clear();
+                ReactorNodes.Clear();
+                ReactorParts.Clear();
+                ReactorLocalFuels.Clear();
+                ReactorLocalProducts.Clear();
+                StockGenerators.Clear();
+                Receivers.Clear();
+            }
         }
 
         private sealed class ReactorEntry
@@ -152,6 +194,8 @@ namespace FNPlugin.Background
             public List<string> LocalProducts;
             public bool HasGenerator;
             public string Exclusion;
+            /// <summary>A thermal mode beamed power receiver standing in for a reactor (no fuel, no catch-up time).</summary>
+            public BackgroundBeams.Receiver Receiver;
         }
 
         private static bool TryGet(ConfigNode node, string key, out double value)
@@ -194,6 +238,8 @@ namespace FNPlugin.Background
             var reactors = new List<ReactorEntry>();
             var reactorByPart = new Dictionary<uint, ReactorEntry>();
             var generators = new List<KeyValuePair<ConfigNode, ProtoPartSnapshot>>();
+            // parts whose reactor or receiver is off (or receives no beams): their generators get nothing, nothing to model
+            var offSources = new HashSet<uint>();
             var transmitting = false;
 
             foreach (var part in protoVessel.protoPartSnapshots)
@@ -211,17 +257,103 @@ namespace FNPlugin.Background
                     if (node == null) continue;
                     var where = part.partName + "/" + module.moduleName;
 
-                    if (TransmitterModules.Contains(module.moduleName) && GetBool(node, "IsEnabled"))
+                    // an active transmitter the model does not run yet (saved before step A3: no transmitter
+                    // values) still takes power the model would not bill: its vessel's reactors keep their catch-up
+                    if (TransmitterModules.Contains(module.moduleName) && GetBool(node, "IsEnabled")
+                        && !(node.GetValue(Version) == CurrentVersion && node.GetValue(BackgroundConsumers.ConsumerMarker) == BackgroundConsumers.TransmitterKind))
                         transmitting = true;
+                    // BeamedPowerReceiver and its subclasses (…PowerReceiver, …PowerReceiverDish, …PowerReceiverPanel)
+                    // saved before step A3 (no receiver values): the model does not know what it gives
+                    if (module.moduleName.Contains("PowerReceiver") && GetBool(node, "receiverIsEnabled")
+                        && !(node.GetValue(Version) == CurrentVersion && node.HasValue(BackgroundBeams.ReceiverMarker)))
+                        reading.PowerIncomplete = true;
 
-                    if (node.GetValue(Version) != CurrentVersion || !GetBool(node, Active)) continue;
-
-                    if (node.HasValue(ReactorMarker))
+                    if (node.GetValue(Version) != CurrentVersion) continue;
+                    if (node.HasValue(SaveError))
                     {
-                        if (reactorByPart.ContainsKey(part.flightID)) continue; // one reactor per part
+                        reading.Problems.Add(where + ": its background values were not saved (" + node.GetValue(SaveError) + ")");
+                        reading.PowerIncomplete = true;
+                        continue;
+                    }
+                    if (!GetBool(node, Active))
+                    {
+                        if (node.HasValue(ReactorMarker) && GetBool(node, PowerUnknown))
+                        {
+                            reading.Excluded.Add(part.partName + ": runs, but the model cannot run it (fusion plasma upkeep or no fuel mode)");
+                            reading.PowerIncomplete = true;
+                        }
+                        else if (node.HasValue(ReactorMarker) && !node.HasValue(PowerUnknown) && GetBool(node, "IsEnabled"))
+                        {
+                            // saved by the step A1 build, which wrote no PowerUnknown: a running reactor it could not run
+                            reading.Excluded.Add(part.partName + ": runs, saved before the model knew whether it can run it (load the vessel once)");
+                            reading.PowerIncomplete = true;
+                        }
+                        else if (node.HasValue(ReactorMarker) || node.HasValue(BackgroundBeams.ReceiverMarker))
+                            offSources.Add(part.flightID);
+                        continue;
+                    }
+
+                    if (node.HasValue(BackgroundBeams.ReceiverMarker))
+                    {
+                        // solar thermal input, thermal receiver slaves and masters: not modelled
+                        if (!GetBool(node, BackgroundBeams.Modelled))
+                        {
+                            reading.Excluded.Add(part.partName + ": beamed power receiver the model does not run (solar thermal, slave or master)");
+                            reading.PowerIncomplete = true;
+                            continue;
+                        }
+                        var problems = reading.Problems.Count;
+                        var receiver = BackgroundBeams.Read(protoVessel.vesselRef, part, node, where, reading.Problems);
+                        if (receiver == null)
+                        {
+                            if (reading.Problems.Count > problems)
+                                reading.PowerIncomplete = true; // unreadable
+                            else
+                                offSources.Add(part.flightID); // not in beamed power mode
+                            continue;
+                        }
+                        if (receiver.BandList.Count == 0)
+                            reading.Problems.Add(where + ": no wavelength band saved");
+                        if (reading.Problems.Count > problems)
+                        {
+                            // a band it could not read (or none): the model would give less than the receiver does
+                            reading.PowerIncomplete = true;
+                            continue;
+                        }
+                        if (receiver.Thermal && reactorByPart.ContainsKey(part.flightID))
+                        {
+                            // its pseudo-reactor would share the part with another one (generators attach by part)
+                            reading.Problems.Add(where + ": thermal receiver on a part that has a reactor or another thermal receiver");
+                            reading.PowerIncomplete = true;
+                            continue;
+                        }
+                        reading.Receivers.Add(receiver);
+                        if (!receiver.Thermal) continue;
+                        var receiverEntry = new ReactorEntry
+                        {
+                            Part = part,
+                            Node = null,
+                            Spec = new ReactorSpec { ThermalMW = 0, ChargedMW = 0, HotBathK = receiver.HotBath, MinimumThrottle = receiver.Minimum },
+                            LocalFuels = new List<string>(),
+                            LocalProducts = new List<string>(),
+                            Receiver = receiver
+                        };
+                        reactors.Add(receiverEntry);
+                        reactorByPart[part.flightID] = receiverEntry;
+                    }
+                    else if (node.HasValue(ReactorMarker))
+                    {
+                        if (reactorByPart.ContainsKey(part.flightID))
+                        {
+                            // one reactor per part: generators attach to a reactor by its part
+                            reading.Problems.Add(where + ": a second reactor or thermal receiver on the part");
+                            reading.PowerIncomplete = true;
+                            continue;
+                        }
                         if (!TryGet(node, ThermalMW, out var thermal) || !TryGet(node, ChargedMW, out var charged) || !TryGet(node, HotBathK, out var hotBath))
                         {
                             reading.Problems.Add(where + ": missing or unreadable reactor power");
+                            reading.PowerIncomplete = true;
                             continue;
                         }
                         var spec = new ReactorSpec
@@ -259,6 +391,7 @@ namespace FNPlugin.Background
                     {
                         if (!TryGet(node, StefanArea, out var area) || !TryGet(node, MaxTemperature, out var maxTemperature) || !TryGet(node, EnvironmentMax, out var environmentMax))
                         {
+                            // a radiator missing from the model makes the plant hotter, never gives free power
                             reading.Problems.Add(where + ": missing or unreadable radiator values");
                             continue;
                         }
@@ -283,15 +416,26 @@ namespace FNPlugin.Background
                 var node = pair.Key;
                 var where = pair.Value.partName + "/generator";
                 if (!uint.TryParse(node.GetValue(ReactorPart), out var reactorPart) || !reactorByPart.TryGetValue(reactorPart, out var reactor))
-                    continue; // fed by something the model does not run (beamed power receiver, unknown source)
+                {
+                    // its reactor or receiver is off: nothing to model; otherwise its power comes from something the
+                    // model does not run (an older save of the source, an unknown source)
+                    if (!offSources.Contains(reactorPart))
+                    {
+                        reading.Problems.Add(where + ": fed by part " + node.GetValue(ReactorPart) + ", which the model does not run");
+                        reading.PowerIncomplete = true;
+                    }
+                    continue;
+                }
                 if (GetBool(node, Mhd))
                 {
                     reactor.Exclusion = reactor.Exclusion ?? "an MHD generator";
+                    reactor.HasGenerator = true; // its power reaches the vessel: PowerIncomplete
                     continue;
                 }
                 if (!TryGet(node, MaxEfficiency, out var efficiency))
                 {
                     reading.Problems.Add(where + ": missing or unreadable generator efficiency");
+                    reading.PowerIncomplete = true;
                     continue;
                 }
                 reactor.HasGenerator = true;
@@ -310,14 +454,30 @@ namespace FNPlugin.Background
             var index = new Dictionary<ReactorEntry, int>();
             foreach (var reactor in reactors)
             {
-                var exclusion = transmitting ? "a beamed power transmitter is on (beam not in the background yet)"
+                if (reactor.Receiver != null)
+                {
+                    // a thermal receiver without a generator gives nothing the model uses: left out silently; with a
+                    // transmitter saved before step A3 on board, its power counts as unknown like the reactors' below.
+                    // Left out, it takes nothing from the transmitters either.
+                    if (transmitting && reactor.HasGenerator) reading.PowerIncomplete = true;
+                    if (!reactor.HasGenerator || transmitting)
+                    {
+                        reading.Receivers.Remove(reactor.Receiver);
+                        continue;
+                    }
+                }
+                var exclusion = transmitting ? "a beamed power transmitter is on without background values (load the vessel once)"
                     : reactor.Exclusion ?? (reactor.HasGenerator ? null : "no generator (its power goes elsewhere, e.g. an engine)");
                 if (exclusion != null)
                 {
                     reading.Excluded.Add(reactor.Part.partName + ": " + exclusion);
+                    if (reactor.HasGenerator || transmitting)
+                        reading.PowerIncomplete = true;
                     continue;
                 }
                 index[reactor] = reading.Spec.Reactors.Count;
+                if (reactor.Receiver != null)
+                    reactor.Receiver.ReactorIndex = reading.Spec.Reactors.Count;
                 reading.Spec.Reactors.Add(reactor.Spec);
                 reading.ReactorNodes.Add(reactor.Node);
                 reading.ReactorParts.Add(reactor.Part);
